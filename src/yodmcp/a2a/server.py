@@ -2,14 +2,12 @@
 
 Endpoints (A2A-aligned)
 -----------------------
-GET  /a2a/.well-known/agent.json   – Agent Card
-GET  /a2a/card                    – Agent Card (alias)
-POST /a2a/message                 – message/send
-GET  /a2a/tasks/{task_id}         – poll task created from a message
-POST /a2a/tasks                   – create long-running task via A2A
-GET  /a2a/health                  – liveness
-
-Mount under FastAPI or run standalone via `python -m yodmcp.a2a.server`.
+GET  /a2a/.well-known/agent.json   – Agent Card (open)
+GET  /a2a/card                    – Agent Card (alias, open)
+POST /a2a/message                 – message/send (auth when keys configured)
+GET  /a2a/tasks/{task_id}         – poll task (auth)
+POST /a2a/tasks                   – create long-running task (auth)
+GET  /a2a/health                  – liveness (open)
 """
 
 from __future__ import annotations
@@ -24,6 +22,9 @@ from pydantic import BaseModel, Field
 from yodmcp.a2a.surface import A2ASurface, build_agent_card
 from yodmcp.core.context import get_context, try_get_context
 from yodmcp.core.substrate import init_substrate
+from yodmcp.security.auth import RequireAuth, auth_required
+from yodmcp.security.rate_limit import RateLimitMiddleware
+from yodmcp import __version__
 
 logger = logging.getLogger("yodmcp.a2a")
 
@@ -53,10 +54,10 @@ def create_a2a_app(
     if init_ctx and try_get_context() is None:
         init_substrate(console_tracing=False)
 
-    surface = A2ASurface(build_agent_card(url=card_url, version="0.4.0"))
+    surface = A2ASurface(build_agent_card(url=card_url, version=__version__))
     app = FastAPI(
         title="YodMCP A2A",
-        version="0.4.0",
+        version=__version__,
         description="Agent2Agent surface for YodMCP Agent Operating System",
     )
     app.add_middleware(
@@ -65,6 +66,7 @@ def create_a2a_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RateLimitMiddleware)
 
     @app.get("/a2a/.well-known/agent.json")
     @app.get("/a2a/card")
@@ -77,12 +79,13 @@ def create_a2a_app(
         return {
             "status": "ok",
             "service": "YodMCP-A2A",
-            "version": "0.4.0",
+            "version": __version__,
             "substrate": ctx is not None,
+            "auth_required": auth_required(),
         }
 
     @app.post("/a2a/message")
-    async def message_send(msg: A2AMessage) -> dict[str, Any]:
+    async def message_send(msg: A2AMessage, auth: RequireAuth) -> dict[str, Any]:
         payload = msg.model_dump()
         if msg.content and not msg.parts:
             payload["parts"] = [{"type": "text", "text": msg.content}]
@@ -92,36 +95,35 @@ def create_a2a_app(
             if p.text:
                 text += p.text
 
-        # Route task-like intents to TaskManager
         if text.lower().startswith("task:"):
             ctx = try_get_context()
             if ctx is None:
                 raise HTTPException(503, "substrate not initialized")
             desc = text[5:].strip()
-            rec = await ctx.tasks.create(tool_name="a2a_message", metadata={"description": desc})
+            rec = await ctx.tasks.create(tool_name="a2a_message", metadata={"description": desc, "tenant": auth.tenant_id})
             handle = ctx.tasks.to_handle(rec)
             return {
                 "role": "agent",
                 "parts": [{"type": "text", "text": f"Task created: {handle['taskId']}"}],
-                "metadata": {"routed": "tasks_create", "task": handle},
+                "metadata": {"routed": "tasks_create", "task": handle, "tenant": auth.tenant_id},
             }
 
         return await surface.handle_message(payload)
 
     @app.post("/a2a/tasks")
-    async def create_task(body: CreateTaskBody) -> dict[str, Any]:
+    async def create_task(body: CreateTaskBody, auth: RequireAuth) -> dict[str, Any]:
         ctx = try_get_context()
         if ctx is None:
             raise HTTPException(503, "substrate not initialized")
         rec = await ctx.tasks.create(
             tool_name="a2a_task",
             ttl_ms=body.ttl_ms,
-            metadata={"description": body.description, **body.metadata},
+            metadata={"description": body.description, "tenant": auth.tenant_id, **body.metadata},
         )
         return ctx.tasks.to_handle(rec)
 
     @app.get("/a2a/tasks/{task_id}")
-    async def get_task(task_id: str) -> dict[str, Any]:
+    async def get_task(task_id: str, auth: RequireAuth) -> dict[str, Any]:
         ctx = try_get_context()
         if ctx is None:
             raise HTTPException(503, "substrate not initialized")
