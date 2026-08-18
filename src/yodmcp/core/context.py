@@ -1,10 +1,4 @@
-"""Request-scoped and process-scoped context for YodMCP.
-
-Uses contextvars so tools, middleware, and extensions can access the
-substrate without a global singleton. Lifespan initializes the process
-defaults; individual requests can override when the SDK supplies a
-request context.
-"""
+"""Request-scoped and process-scoped context for YodMCP."""
 
 from __future__ import annotations
 
@@ -20,6 +14,7 @@ if TYPE_CHECKING:
     from yodmcp.cache.layer import CacheLayer
     from yodmcp.tasks.manager import TaskManager
     from yodmcp.skills.registry import SkillsRegistry
+    from yodmcp.monetization.billing import BillingService
 
 
 @dataclass
@@ -31,6 +26,7 @@ class YodContext:
     attestation: "AttestationService"
     tasks: "TaskManager"
     skills: "SkillsRegistry"
+    billing: "BillingService"
     tracer_name: str = "yodmcp"
 
 

@@ -12,6 +12,7 @@ from yodmcp.observability.audit import AuditLogger
 from yodmcp.cache.layer import CacheLayer
 from yodmcp.tasks.manager import TaskManager
 from yodmcp.skills.registry import SkillsRegistry
+from yodmcp.monetization.billing import BillingService
 from yodmcp.observability.otel import init_tracing
 
 
@@ -21,14 +22,6 @@ def init_substrate(
     memory_db_path: str | None = None,
     attest_mode: str | None = None,
 ) -> YodContext:
-    """Boot substrate.
-
-    Env overrides
-    -------------
-    YODMCP_MEMORY_BACKEND  memory | sqlite
-    YODMCP_MEMORY_DB       path for sqlite file
-    YODMCP_ATTEST_MODE     software | simulated_tee | tee_nitro | tee_sgx
-    """
     init_tracing(console=console_tracing)
     backend = memory_backend or os.environ.get("YODMCP_MEMORY_BACKEND", "memory")
     db_path = memory_db_path or os.environ.get("YODMCP_MEMORY_DB", "yodmcp_memory.db")
@@ -45,6 +38,7 @@ def init_substrate(
         attestation=attestation,
         tasks=TaskManager(),
         skills=SkillsRegistry(),
+        billing=BillingService(),
     )
     set_context(ctx)
     return ctx
