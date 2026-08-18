@@ -156,8 +156,10 @@ class AuditLogger:
         by_type: dict[str, int] = {}
         for e in self._events:
             by_type[e.event_type] = by_type.get(e.event_type, 0) + 1
+        total = len(self._events)
         return {
-            "total": len(self._events),
+            "total": total,
+            "total_events": total,  # backward compat
             "by_type": by_type,
             "backend": self._backend,
             "log_path": str(self._path),
