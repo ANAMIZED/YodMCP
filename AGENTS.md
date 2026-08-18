@@ -10,3 +10,4 @@
 ## New repos
 
 Run `skills/repo-bootstrap` + `scripts/bootstrap_repo_structure.sh` so USDC, FUNDING.yml, and package surfaces match server-os automatically.
+- Disk skills: `skills/*/SKILL.md` are auto-loaded (override with `YODMCP_SKILLS_DIR`).
