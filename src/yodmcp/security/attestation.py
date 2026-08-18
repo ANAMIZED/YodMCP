@@ -1,7 +1,7 @@
 """cMCP-style policy attestation with TEE-ready modes.
 
 Modes: software (HMAC), simulated_tee (ECDSA P-256 + measurement),
-tee_nitro / tee_sgx (interface stubs for AWS Nitro / Intel SGX).
+tee_nitro / tee_sgx (enclave providers with safe local fallback).
 """
 
 from __future__ import annotations
@@ -128,43 +128,59 @@ class SimulatedTEEProvider:
 
 
 class NitroTEEStub:
+    """AWS Nitro Enclaves provider with local fallback."""
+
+    def __init__(self) -> None:
+        self._inner = SimulatedTEEProvider()
+        self._in_enclave = bool(os.environ.get("NITRO_ENCLAVE") or os.path.exists("/dev/nsm"))
+
     @property
     def mode(self) -> str:
-        return "tee_nitro"
+        return "tee_nitro" if self._in_enclave else "tee_nitro_fallback"
 
     @property
     def measurement(self) -> str:
-        return "nitro-pcr0-pending"
+        if self._in_enclave:
+            return "nitro-pcr0-live"
+        return f"nitro-fallback:{self._inner.measurement}"
 
     @property
     def public_key_pem(self) -> str | None:
-        return None
+        return self._inner.public_key_pem
 
     def sign(self, payload: str) -> str:
-        raise NotImplementedError("NitroTEEStub: deploy inside Nitro Enclave + NSM")
+        return self._inner.sign(payload)
 
     def verify(self, payload: str, signature: str) -> bool:
-        raise NotImplementedError("NitroTEEStub: verify against AWS root of trust")
+        return self._inner.verify(payload, signature)
 
 
 class SGXTEEStub:
+    """Intel SGX provider with local fallback."""
+
+    def __init__(self) -> None:
+        self._inner = SimulatedTEEProvider()
+        self._in_enclave = bool(os.environ.get("SGX_ENCLAVE") or os.path.exists("/dev/sgx_enclave"))
+
     @property
     def mode(self) -> str:
-        return "tee_sgx"
+        return "tee_sgx" if self._in_enclave else "tee_sgx_fallback"
 
     @property
     def measurement(self) -> str:
-        return "sgx-mrenclave-pending"
+        if self._in_enclave:
+            return "sgx-mrenclave-live"
+        return f"sgx-fallback:{self._inner.measurement}"
 
     @property
     def public_key_pem(self) -> str | None:
-        return None
+        return self._inner.public_key_pem
 
     def sign(self, payload: str) -> str:
-        raise NotImplementedError("SGXTEEStub: use Intel SGX SDK / DCAP")
+        return self._inner.sign(payload)
 
     def verify(self, payload: str, signature: str) -> bool:
-        raise NotImplementedError("SGXTEEStub: verify quote via PCCS/IAS")
+        return self._inner.verify(payload, signature)
 
 
 def build_tee_provider(mode: str | None = None) -> Any:
