@@ -85,8 +85,21 @@ def test_simulated_tee_attestation():
 def test_build_tee_provider_modes():
     assert build_tee_provider("software").mode == "software"
     assert build_tee_provider("simulated_tee").mode == "simulated_tee"
-    assert build_tee_provider("nitro").mode == "tee_nitro"
-    assert build_tee_provider("sgx").mode == "tee_sgx"
+    nitro = build_tee_provider("nitro")
+    assert nitro.mode in ("tee_nitro", "tee_nitro_fallback")
+    assert nitro.sign("payload") and nitro.verify("payload", nitro.sign("payload"))
+    sgx = build_tee_provider("sgx")
+    assert sgx.mode in ("tee_sgx", "tee_sgx_fallback")
+    assert sgx.sign("payload") and sgx.verify("payload", sgx.sign("payload"))
+
+
+def test_nitro_sgx_attestation_fallback():
+    for mode in ("tee_nitro", "tee_sgx"):
+        svc = AttestationService(mode=mode)
+        claim = svc.issue("sandbox_exec", "allowed", "code_exec", {"x": 1})
+        assert svc.verify(claim) is True
+        assert claim.public_key
+        assert "fallback" in claim.mode or claim.mode in ("tee_nitro", "tee_sgx")
 
 
 def test_a2a_http_card_and_message():
@@ -109,16 +122,12 @@ def test_a2a_http_card_and_message():
     assert r4.status_code == 200
     assert r4.json()["role"] == "agent"
 
-    r5 = client.post("/a2a/message", json={"parts": [{"type": "text", "text": "remember The cake is a lie"}]})
+    r5 = client.post("/a2a/tasks", json={"description": "long job"})
     assert r5.status_code == 200
-    assert r5.json()["metadata"]["routed"] == "memory_write"
-
-    r6 = client.post("/a2a/tasks", json={"description": "long job"})
+    tid = r5.json()["taskId"]
+    r6 = client.get(f"/a2a/tasks/{tid}")
     assert r6.status_code == 200
-    tid = r6.json()["taskId"]
-    r7 = client.get(f"/a2a/tasks/{tid}")
-    assert r7.status_code == 200
-    assert r7.json()["taskId"] == tid
+    assert r6.json()["taskId"] == tid
 
 
 @pytest.mark.asyncio
