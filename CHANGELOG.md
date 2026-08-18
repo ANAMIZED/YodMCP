@@ -1,17 +1,26 @@
 # Changelog
 
-## 0.5.0-dev (production-prep)
+## 0.5.0-dev (production-prep / multi-tenant SaaS polish)
 
 ### Added
-- **Auth foundation (P0.1)**: `YODMCP_API_KEY` / `YODMCP_API_KEYS` protect API routes via Bearer or `X-API-Key`. Health remains open. See `src/yodmcp/security/auth.py`.
-- **Durable tasks & metering (P0.2)**: `YODMCP_TASKS_BACKEND=sqlite` and `YODMCP_METER_BACKEND=sqlite` (or shared `YODMCP_SYSTEM_DB`).
-- **Docker harden**: non-root user (uid 10001), `HEALTHCHECK` on `/health`, system DB env defaults.
-- **Billing webhook stub**: `POST /api/billing/webhook` (signature + entitlement activation still TODO).
-- **docs/PRODUCTION.md**: full P0–P3 roadmap and production definition.
+- **Request-scoped tenant** (`X-YodMCP-Tenant` + ContextVar) wired into auth, gate, billing
+- **HITL queue** + `/api/hitl/pending` and `/api/hitl/{id}/decide`
+- **Tenant policy allow/deny lists** + `/api/policy/allowlist|denylist`
+- **Input validation** size limits on tool args / memory content
+- **Structured JSON logging** (`YODMCP_LOG_FORMAT=json`) with tenant + request_id
+- **MCP Streamable HTTP API-key auth** when keys configured
+- **Rate limiting** middleware on API/A2A
+- Durable tasks, meter, entitlements, audit index (SQLite)
+- Stripe webhook → entitlement activation
+- Hardened Docker (non-root, HEALTHCHECK), `/ready` probe
+- CI: pip-audit + freeze SBOM artifact; SaaS test module
 
 ### Notes
-Still **not production-ready** for public traffic or paid tenants until full Stripe entitlement store, request-scoped tenants, OTLP, and MCP protocol CI land. Position as self-hosted beta.
+- Embeddings remain toy cosine; do not market as production semantic search
+- TEE nitro/sgx remain simulated unless real providers are wired
+- `frontend/dashboard.py` is **legacy** (uses `core.runtime`); prefer API/HITL endpoints
+- Full OPA/Cedar policy-as-code and distributed rate limits are still roadmap
 
 ## 0.4.0
 
-- Initial public prototype: MCP surfaces, multi-graph memory (memory/sqlite), soft quotas, A2A card + message, skills, attestation (software/simulated_tee), OTEL console, verify_e2e.
+- Initial public prototype: MCP surfaces, multi-graph memory, soft quotas, A2A, skills, attestation stubs, OTEL console, verify_e2e
