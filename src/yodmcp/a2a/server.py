@@ -2,12 +2,12 @@
 
 Endpoints (A2A-aligned)
 -----------------------
-GET  /a2a/.well-known/agent.json   - Agent Card
-GET  /a2a/card                    - Agent Card (alias)
-POST /a2a/message                 - message/send
-GET  /a2a/tasks/{task_id}         - poll task
-POST /a2a/tasks                   - create long-running task via A2A
-GET  /a2a/health                  - liveness
+GET  /a2a/.well-known/agent.json   – Agent Card
+GET  /a2a/card                    – Agent Card (alias)
+POST /a2a/message                 – message/send
+GET  /a2a/tasks/{task_id}         – poll task created from a message
+POST /a2a/tasks                   – create long-running task via A2A
+GET  /a2a/health                  – liveness
 
 Mount under FastAPI or run standalone via `python -m yodmcp.a2a.server`.
 """
@@ -84,22 +84,19 @@ def create_a2a_app(
     @app.post("/a2a/message")
     async def message_send(msg: A2AMessage) -> dict[str, Any]:
         payload = msg.model_dump()
-        ctx = try_get_context()
+        if msg.content and not msg.parts:
+            payload["parts"] = [{"type": "text", "text": msg.content}]
+
         text = msg.content or ""
         for p in msg.parts:
             if p.text:
                 text += p.text
 
-        if ctx and text.lower().startswith("remember "):
-            fact = text[9:].strip()
-            item_id = await ctx.memory.write(fact, importance=0.7)
-            return {
-                "role": "agent",
-                "parts": [{"type": "text", "text": f"Stored memory {item_id[:8]}..."}],
-                "metadata": {"routed": "memory_write", "item_id": item_id},
-            }
-
-        if ctx and text.lower().startswith("task "):
+        # Route task-like intents to TaskManager
+        if text.lower().startswith("task:"):
+            ctx = try_get_context()
+            if ctx is None:
+                raise HTTPException(503, "substrate not initialized")
             desc = text[5:].strip()
             rec = await ctx.tasks.create(tool_name="a2a_message", metadata={"description": desc})
             handle = ctx.tasks.to_handle(rec)
