@@ -89,7 +89,7 @@ def register_core_tools(server: MCPServer) -> None:
 
     @server.tool(name="echo", description="Connectivity probe.")
     async def echo(message: str = "ping") -> dict[str, Any]:
-        return {"echo": message, "server": "YodMCP", "version": "0.2.0"}
+        return {"echo": message, "server": "YodMCP", "version": "0.4.0"}
 
     @server.tool(name="tasks_create", description="Create durable async task handle (Tasks extension).")
     async def tasks_create(tool_name: str | None = None, ttl_ms: int = 3600000, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
