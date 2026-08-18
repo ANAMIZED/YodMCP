@@ -1,17 +1,20 @@
 """Decision System of Record (DSoR) style audit trail for YodMCP.
 
 Every tool call, memory op, policy decision, and agent interaction is recorded
-with provenance. Production upgrades to immutable Merkle chain + TRACE Claims.
+with provenance. Supports process-local + JSONL and optional SQLite durable index.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+import aiosqlite
 
 
 @dataclass
@@ -29,11 +32,47 @@ class AuditEvent:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
+AUDIT_SCHEMA = """
+CREATE TABLE IF NOT EXISTS audit_events (
+    id TEXT PRIMARY KEY,
+    timestamp REAL NOT NULL,
+    event_type TEXT NOT NULL,
+    actor TEXT,
+    session_id TEXT,
+    tool_name TEXT,
+    arguments_summary TEXT,
+    decision TEXT,
+    risk_tier TEXT,
+    outcome TEXT,
+    metadata TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_events(timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_type ON audit_events(event_type);
+"""
+
+
 class AuditLogger:
-    def __init__(self, log_path: str | Path | None = None) -> None:
+    def __init__(self, log_path: str | Path | None = None, db_path: str | Path | None = None) -> None:
         self._events: list[AuditEvent] = []
-        self._path = Path(log_path) if log_path else Path("/tmp/yodmcp_audit.jsonl")
+        self._path = Path(log_path) if log_path else Path(
+            os.environ.get("YODMCP_AUDIT_LOG", "/tmp/yodmcp_audit.jsonl")
+        )
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._backend = os.environ.get("YODMCP_AUDIT_BACKEND", "jsonl").lower()
+        self._db_path = str(
+            db_path
+            or os.environ.get("YODMCP_SYSTEM_DB")
+            or os.environ.get("YODMCP_MEMORY_DB", "./data/yodmcp_system.db")
+        )
+        self._db: aiosqlite.Connection | None = None
+
+    async def _conn(self) -> aiosqlite.Connection:
+        if self._db is None:
+            Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
+            self._db = await aiosqlite.connect(self._db_path)
+            await self._db.executescript(AUDIT_SCHEMA)
+            await self._db.commit()
+        return self._db
 
     def record(
         self,
@@ -69,9 +108,46 @@ class AuditLogger:
             metadata=metadata or {},
         )
         self._events.append(event)
-        with self._path.open("a") as f:
-            f.write(json.dumps(asdict(event)) + "\n")
+        try:
+            with self._path.open("a") as f:
+                f.write(json.dumps(asdict(event)) + "\n")
+        except Exception:
+            pass
+
+        if self._backend in ("sqlite", "db", "durable"):
+            try:
+                import asyncio
+
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self._persist(event))
+                else:
+                    loop.run_until_complete(self._persist(event))
+            except Exception:
+                pass
         return event_id
+
+    async def _persist(self, event: AuditEvent) -> None:
+        db = await self._conn()
+        await db.execute(
+            "INSERT OR IGNORE INTO audit_events "
+            "(id, timestamp, event_type, actor, session_id, tool_name, arguments_summary, "
+            "decision, risk_tier, outcome, metadata) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                event.id,
+                event.timestamp,
+                event.event_type,
+                event.actor,
+                event.session_id,
+                event.tool_name,
+                event.arguments_summary,
+                event.decision,
+                event.risk_tier,
+                event.outcome,
+                json.dumps(event.metadata),
+            ),
+        )
+        await db.commit()
 
     def recent(self, limit: int = 50) -> list[AuditEvent]:
         return self._events[-limit:]
@@ -81,7 +157,8 @@ class AuditLogger:
         for e in self._events:
             by_type[e.event_type] = by_type.get(e.event_type, 0) + 1
         return {
-            "total_events": len(self._events),
+            "total": len(self._events),
             "by_type": by_type,
+            "backend": self._backend,
             "log_path": str(self._path),
         }
