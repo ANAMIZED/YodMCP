@@ -1,0 +1,28 @@
+{
+  "asset": "USDC",
+  "version": 1,
+  "recipient": "ANAMIZED",
+  "source_of_truth": "ANAMIZED/server-os README + shared across product repos",
+  "networks": {
+    "base": {
+      "chain_id": 8453,
+      "caip2": "eip155:8453",
+      "address": "0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438",
+      "explorer": "https://basescan.org/address/0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438",
+      "preferred": true
+    },
+    "ethereum": {
+      "chain_id": 1,
+      "caip2": "eip155:1",
+      "address": "0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438",
+      "explorer": "https://etherscan.io/address/0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438"
+    },
+    "solana": {
+      "chain_id": null,
+      "caip2": "solana:mainnet",
+      "address": "ETQwWf19axArsY493UfC6bxe2BmEzmzvCb58PPnC38A",
+      "explorer": "https://solscan.io/account/ETQwWf19axArsY493UfC6bxe2BmEzmzvCb58PPnC38A"
+    }
+  },
+  "notes": "Non-custodial USDC only. Wrong asset or network may result in permanent loss."
+}
