@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1322">
+<meta name="description" content="YodMCP — a production-oriented Agent Operating System kernel on MCP 2026-07-28. Multi-graph memory, tasks, skills, A2A, attestation, telemetry, and plan-based billing.">
+<title>YodMCP — An operating system for agents</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23FFB000'/%3E%3Ctext x='32' y='46' font-size='40' font-family='Georgia,serif' text-anchor='middle' fill='%230F1322'%3E%D7%99%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ---------- tokens ---------- */
+:root{
+  --bg:#0F1322;            /* midnight kernel */
+  --bg-elev:#151B30;
+  --panel:#121729;
+  --term:#0B0F1D;
+  --line:rgba(233,228,214,.10);
+  --line-strong:rgba(233,228,214,.18);
+  --text:#E9E4D6;          /* warm parchment */
+  --muted:#9BA0B4;
+  --amber:#FFB000;         /* P3 phosphor */
+  --amber-soft:#FFCE6B;
+  --amber-dim:rgba(255,176,0,.14);
+  --cool:#7FB8CE;          /* protocol blue */
+  --ok:#58C08A;
+  --err:#E5735F;
+  --display:"Bricolage Grotesque",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --radius:14px;
+  --nav-h:58px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--body);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(rgba(233,228,214,.045) 1px,transparent 1px);
+  background-size:26px 26px;
+}
+::selection{background:var(--amber);color:#0F1322}
+a{color:var(--amber-soft);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px;border-radius:4px}
+img,svg{display:block}
+section{scroll-margin-top:calc(var(--nav-h) + 16px)}
+
+/* ---------- type ---------- */
+h1,h2{font-family:var(--display);letter-spacing:-.02em;line-height:1.05;text-wrap:balance}
+h1{font-size:clamp(2.35rem,7.5vw,4.4rem);font-weight:800}
+h2{font-size:clamp(1.6rem,4.5vw,2.4rem);font-weight:700}
+.eyebrow{
+  font-family:var(--mono);font-size:.72rem;font-weight:600;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--amber);
+}
+.lede{color:var(--muted);max-width:58ch}
+
+/* ---------- layout ---------- */
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.section{padding:72px 0}
+@media(min-width:760px){.section{padding:104px 0}}
+.section-head{display:flex;flex-direction:column;gap:12px;margin-bottom:36px}
+
+/* ---------- nav ---------- */
+.nav{
+  position:sticky;top:0;z-index:50;height:var(--nav-h);
+  display:flex;align-items:center;
+  background:rgba(15,19,34,.86);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.nav-inner{display:flex;align-items:center;gap:18px;width:100%}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:1.05rem;color:var(--text)}
+.brand:hover{text-decoration:none}
+.yod-mark{
+  width:30px;height:30px;border-radius:8px;flex:none;
+  background:var(--amber);color:#0F1322;
+  display:grid;place-items:center;
+  font-family:Georgia,serif;font-size:1.15rem;font-weight:700;line-height:1;
+}
+.nav-links{display:none;gap:4px;margin-left:auto}
+.nav-links a{
+  color:var(--muted);font-size:.9rem;font-weight:500;
+  padding:8px 12px;border-radius:8px;
+}
+.nav-links a:hover{color:var(--text);background:var(--bg-elev);text-decoration:none}
+@media(min-width:820px){.nav-links{display:flex}}
+.gh-btn{
+  margin-left:auto;display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:.8rem;font-weight:600;
+  color:var(--text);border:1px solid var(--line-strong);
+  padding:9px 14px;border-radius:10px;white-space:nowrap;
+}
+.gh-btn:hover{border-color:var(--amber);color:var(--amber-soft);text-decoration:none}
+@media(min-width:820px){.gh-btn{margin-left:0}}
+
+/* ---------- hero ---------- */
+.hero{
+  position:relative;padding:64px 0 80px;text-align:center;overflow:hidden;
+}
+.hero::before{
+  content:"";position:absolute;inset:-20% -10% auto;height:520px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(255,176,0,.10),transparent 62%);
+  pointer-events:none;
+}
+@media(min-width:760px){.hero{padding:96px 0 110px}}
+.hero .wrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:22px}
+.hero .lede{margin:0 auto;font-size:clamp(1rem,2.4vw,1.15rem)}
+.hero-ctas{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  font-weight:600;font-size:.95rem;
+  padding:13px 22px;border-radius:12px;border:1px solid transparent;
+  cursor:pointer;min-height:46px;
+}
+.btn-primary{background:var(--amber);color:#0F1322}
+.btn-primary:hover{background:var(--amber-soft);text-decoration:none}
+.btn-ghost{border-color:var(--line-strong);color:var(--text)}
+.btn-ghost:hover{border-color:var(--amber);color:var(--amber-soft);text-decoration:none}
+.badges{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.badge{
+  font-family:var(--mono);font-size:.7rem;font-weight:500;color:var(--muted);
+  border:1px solid var(--line);border-radius:999px;padding:5px 12px;
+}
+.badge b{color:var(--amber-soft);font-weight:600}
+
+/* ---------- terminal (signature) ---------- */
+.term{
+  width:100%;max-width:800px;text-align:left;
+  background:var(--term);
+  border:1px solid var(--line-strong);border-radius:var(--radius);
+  box-shadow:0 0 0 1px rgba(0,0,0,.4),0 24px 60px -24px rgba(0,0,0,.8),0 0 70px -18px rgba(255,176,0,.22);
+  overflow:hidden;position:relative;
+}
+.term-head{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 14px;border-bottom:1px solid var(--line);
+  background:rgba(233,228,214,.03);
+}
+.dots{display:flex;gap:6px}
+.dot{width:11px;height:11px;border-radius:50%;background:rgba(233,228,214,.16)}
+.dot:first-child{background:rgba(229,115,95,.7)}
+.term-title{font-family:var(--mono);font-size:.74rem;color:var(--muted);flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.term-tag{font-family:var(--mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px;flex:none}
+.term-body{position:relative;padding:16px 16px 8px;height:min(52vh,400px);display:flex;flex-direction:column}
+.term-body::after{ /* scanlines, terminal only */
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
+  mix-blend-mode:multiply;opacity:.5;
+}
+.term-out{
+  flex:1;overflow-y:auto;overscroll-behavior:contain;
+  font-family:var(--mono);font-size:.82rem;line-height:1.72;
+  color:var(--text);
+  text-shadow:0 0 6px rgba(255,176,0,.10);
+  white-space:pre-wrap;word-break:break-word;
+}
+.term-out .ok{color:var(--ok)}
+.term-out .k{color:var(--amber-soft)}
+.term-out .dim{color:var(--muted)}
+.term-out .err{color:var(--err)}
+.term-out .cmd{color:var(--amber)}
+.term-out a{color:var(--cool);text-decoration:underline}
+.prompt-row{
+  display:flex;align-items:center;gap:8px;
+  border-top:1px solid var(--line);margin:8px -16px 0;padding:10px 16px;
+  position:relative;z-index:1;
+}
+.prompt-sym{font-family:var(--mono);font-size:.82rem;color:var(--amber);flex:none;text-shadow:0 0 6px rgba(255,176,0,.35)}
+.term-input{
+  flex:1;background:transparent;border:none;color:var(--text);
+  font-family:var(--mono);font-size:16px;line-height:1.4;caret-color:var(--amber);
+}
+.term-input:focus{outline:none}
+.term-input::placeholder{color:rgba(155,160,180,.5)}
+.cursor{display:inline-block;width:8px;height:1.05em;background:var(--amber);vertical-align:text-bottom;animation:blink 1.05s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.cursor{animation:none}}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:800px}
+.chip{
+  font-family:var(--mono);font-size:.78rem;font-weight:500;
+  color:var(--amber-soft);background:var(--amber-dim);
+  border:1px solid rgba(255,176,0,.28);border-radius:999px;
+  padding:9px 16px;cursor:pointer;min-height:38px;
+}
+.chip:hover{background:rgba(255,176,0,.24)}
+.term-note{font-family:var(--mono);font-size:.68rem;color:var(--muted);letter-spacing:.06em}
+
+/* ---------- system grid ---------- */
+.grid{display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:620px){.grid{grid-template-columns:1fr 1fr}}
+@media(min-width:980px){.grid{grid-template-columns:repeat(4,1fr)}}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:20px;display:flex;flex-direction:column;gap:8px;
+}
+.card:hover{border-color:rgba(255,176,0,.35)}
+.card .tag{font-family:var(--mono);font-size:.7rem;color:var(--amber)}
+.card h3{font-family:var(--display);font-size:1.02rem;font-weight:700}
+.card p{color:var(--muted);font-size:.88rem;line-height:1.55}
+
+/* ---------- surfaces ---------- */
+.tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  flex:none;font-family:var(--mono);font-size:.8rem;font-weight:600;
+  color:var(--muted);background:transparent;border:1px solid var(--line);
+  border-radius:999px;padding:9px 18px;cursor:pointer;min-height:38px;
+}
+.tab[aria-selected="true"]{color:#0F1322;background:var(--amber);border-color:var(--amber)}
+.tab:hover:not([aria-selected="true"]){color:var(--text);border-color:var(--line-strong)}
+.surface-panel{
+  margin-top:14px;background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);padding:22px;display:flex;flex-direction:column;gap:12px;
+}
+.surface-entry{
+  font-family:var(--mono);font-size:.84rem;color:var(--amber-soft);
+  background:var(--term);border:1px solid var(--line);border-radius:10px;
+  padding:12px 14px;overflow-x:auto;white-space:nowrap;
+}
+.surface-desc{color:var(--muted);font-size:.92rem}
+
+/* ---------- stack ---------- */
+.stack-wrap{display:grid;gap:22px;grid-template-columns:1fr}
+@media(min-width:900px){.stack-wrap{grid-template-columns:1.4fr 1fr;align-items:start}}
+.layers{display:flex;flex-direction:column;gap:10px}
+.layer{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);overflow:hidden}
+.layer-head{
+  width:100%;display:flex;align-items:center;gap:14px;
+  background:transparent;border:none;color:var(--text);
+  font-family:var(--display);font-weight:700;font-size:1rem;
+  padding:16px 18px;cursor:pointer;text-align:left;min-height:52px;
+}
+.layer-head:hover{background:rgba(233,228,214,.03)}
+.layer-num{font-family:var(--mono);font-size:.74rem;font-weight:600;color:var(--amber);flex:none;width:2ch}
+.layer-caret{margin-left:auto;color:var(--muted);transition:transform .2s;flex:none}
+.layer-head[aria-expanded="true"] .layer-caret{transform:rotate(90deg)}
+.layer-body{display:none;padding:0 18px 18px 46px}
+.layer-head[aria-expanded="true"]+.layer-body{display:block}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px}
+.pill{
+  font-family:var(--mono);font-size:.74rem;color:var(--text);
+  border:1px solid var(--line-strong);border-radius:999px;padding:5px 12px;
+}
+.plane{
+  background:var(--panel);border:1px solid rgba(255,176,0,.28);border-radius:var(--radius);
+  padding:22px;display:flex;flex-direction:column;gap:12px;
+}
+.plane h3{font-family:var(--display);font-size:1.05rem}
+.plane ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+.plane li{color:var(--muted);font-size:.9rem;padding-left:18px;position:relative}
+.plane li::before{content:"·";color:var(--amber);position:absolute;left:2px;font-weight:700}
+.plane code{font-family:var(--mono);font-size:.82em;color:var(--amber-soft)}
+
+/* ---------- quick start ---------- */
+.qs{
+  background:var(--term);border:1px solid var(--line-strong);border-radius:var(--radius);
+  overflow:hidden;max-width:720px;
+}
+.qs-head{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.74rem;color:var(--muted)}
+.qs-body{padding:8px 6px}
+.qs-line{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px}
+.qs-line:hover{background:rgba(233,228,214,.03)}
+.qs-line code{flex:1;font-family:var(--mono);font-size:.84rem;color:var(--text);overflow-x:auto;white-space:nowrap}
+.qs-line code .p{color:var(--amber)}
+.copy-btn{
+  flex:none;font-family:var(--mono);font-size:.68rem;font-weight:600;color:var(--muted);
+  background:transparent;border:1px solid var(--line);border-radius:7px;
+  padding:6px 10px;cursor:pointer;min-height:30px;
+}
+.copy-btn:hover{color:var(--amber-soft);border-color:var(--amber)}
+.copy-btn.done{color:var(--ok);border-color:var(--ok)}
+
+/* ---------- plans ---------- */
+.plans-grid{display:grid;gap:14px;grid-template-columns:1fr}
+@media(min-width:820px){.plans-grid{grid-template-columns:repeat(3,1fr)}}
+.plan{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:26px 22px;display:flex;flex-direction:column;gap:16px;
+}
+.plan.featured{border-color:rgba(255,176,0,.5);box-shadow:0 0 46px -18px rgba(255,176,0,.3)}
+.plan-name{font-family:var(--mono);font-size:.76rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--amber)}
+.plan-price{font-family:var(--display);font-size:2.3rem;font-weight:800;line-height:1}
+.plan-price span{font-family:var(--body);font-size:.85rem;font-weight:400;color:var(--muted)}
+.plan ul{list-style:none;display:flex;flex-direction:column;gap:9px;flex:1}
+.plan li{color:var(--muted);font-size:.88rem;display:flex;gap:9px;align-items:baseline}
+.plan li::before{content:"›";color:var(--amber);font-family:var(--mono);flex:none}
+.plan li b{color:var(--text);font-weight:600}
+.plan .btn{justify-content:center}
+
+/* ---------- funding ---------- */
+.fund{
+  margin-top:40px;background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);padding:24px;display:flex;flex-direction:column;gap:14px;
+}
+.fund h3{font-family:var(--display);font-size:1.05rem}
+.fund-sub{color:var(--muted);font-size:.86rem}
+.addr-row{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--term);
+}
+.addr-net{font-family:var(--mono);font-size:.72rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--cool);flex:none;width:76px}
+.addr-val{flex:1;min-width:180px;font-family:var(--mono);font-size:.76rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.addr-link{font-family:var(--mono);font-size:.7rem;flex:none}
+
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--line);padding:44px 0 56px;color:var(--muted);font-size:.86rem}
+.foot-inner{display:flex;flex-direction:column;gap:22px}
+@media(min-width:760px){.foot-inner{flex-direction:row;justify-content:space-between;align-items:flex-start}}
+.foot-links{display:flex;gap:18px;flex-wrap:wrap}
+.foot-links a{color:var(--muted)}
+.foot-links a:hover{color:var(--amber-soft)}
+.foot-small{font-family:var(--mono);font-size:.68rem;color:rgba(155,160,180,.7);max-width:52ch}
+
+/* ---------- reveal ---------- */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top" aria-label="YodMCP home">
+      <span class="yod-mark" aria-hidden="true">י</span>
+      YodMCP
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#system">System</a>
+      <a href="#surfaces">Surfaces</a>
+      <a href="#stack">Stack</a>
+      <a href="#quickstart">Quick start</a>
+      <a href="#plans">Plans</a>
+    </nav>
+    <a class="gh-btn" href="https://github.com/ANAMIZED/YodMCP" target="_blank" rel="noopener">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      Star on GitHub
+    </a>
+  </div>
+</header>
+
+<!-- ============ HERO / BOOT ============ -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <p class="eyebrow">Agent Operating System · Kernel v0.4.0 · MCP 2026-07-28</p>
+    <h1>An operating system<br>for agents.</h1>
+    <p class="lede">YodMCP is a production-oriented Agent OS kernel: multi-graph memory, tasks, skills, agent-to-agent messaging, attestation, telemetry, and plan-based billing — served over MCP from a single Python package.</p>
+    <div class="hero-ctas">
+      <a class="btn btn-primary" href="https://github.com/ANAMIZED/YodMCP" target="_blank" rel="noopener">View on GitHub</a>
+      <a class="btn btn-ghost" href="#quickstart">Quick start</a>
+    </div>
+
+    <div class="term" id="term">
+      <div class="term-head">
+        <div class="dots" aria-hidden="true"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <div class="term-title">yod — /dev/agent0</div>
+        <span class="term-tag">simulated</span>
+      </div>
+      <div class="term-body">
+        <div class="term-out" id="termOut" aria-live="polite"></div>
+        <form class="prompt-row" id="termForm">
+          <span class="prompt-sym" aria-hidden="true">guest@yod:~$</span>
+          <input class="term-input" id="termInput" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="type help" aria-label="Console command input">
+        </form>
+      </div>
+    </div>
+
+    <div class="chips" id="chips" role="group" aria-label="Console shortcuts">
+      <button class="chip" data-cmd="help">help</button>
+      <button class="chip" data-cmd="status">status</button>
+      <button class="chip" data-cmd="surfaces">surfaces</button>
+      <button class="chip" data-cmd="arch">arch</button>
+      <button class="chip" data-cmd="plans">plans</button>
+      <button class="chip" data-cmd="boot">boot</button>
+    </div>
+    <p class="term-note">interactive demo · output is simulated locally, no server required</p>
+
+    <div class="badges">
+      <span class="badge">version <b>0.4.0</b></span>
+      <span class="badge">python <b>3.11 / 3.12</b></span>
+      <span class="badge">license <b>Apache-2.0</b></span>
+      <span class="badge">MCP <b>2026-07-28</b></span>
+      <span class="badge">A2A <b>ready</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SYSTEM ============ -->
+<section class="section" id="system">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">System</p>
+      <h2>What ships in the kernel</h2>
+      <p class="lede">Eight subsystems, one server process.</p>
+    </div>
+    <div class="grid">
+      <div class="card reveal"><span class="tag">[mem]</span><h3>Multi-graph memory</h3><p>Structured recall across multiple knowledge graphs, not one flat store.</p></div>
+      <div class="card reveal"><span class="tag">[task]</span><h3>Tasks</h3><p>Create, track, and resume long-running work as first-class tasks.</p></div>
+      <div class="card reveal"><span class="tag">[skill]</span><h3>Skills</h3><p>Reusable agent instructions served as <code style="font-family:var(--mono);font-size:.85em;color:var(--amber-soft)">skills://</code> resources with SKILL.md files.</p></div>
+      <div class="card reveal"><span class="tag">[a2a]</span><h3>A2A</h3><p>Serve an Agent Card and exchange messages and tasks with other agents.</p></div>
+      <div class="card reveal"><span class="tag">[tee]</span><h3>TEE attestation</h3><p>Attestation baked in — simulated on Pro, Nitro/SGX hooks on Enterprise.</p></div>
+      <div class="card reveal"><span class="tag">[otel]</span><h3>OpenTelemetry</h3><p>Traces and metrics wired through the kernel, ready for your collector.</p></div>
+      <div class="card reveal"><span class="tag">[cache]</span><h3>Caching</h3><p>Response caching to keep repeated calls fast and cheap.</p></div>
+      <div class="card reveal"><span class="tag">[bill]</span><h3>Billing</h3><p>Plan catalog with soft quotas enforced right at the tool gate.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SURFACES ============ -->
+<section class="section" id="surfaces">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">Surfaces</p>
+      <h2>One package, eight ways in</h2>
+      <p class="lede">Every surface below ships in the same install. Pick how you want to talk to it.</p>
+    </div>
+    <div class="reveal">
+      <div class="tabs" role="tablist" aria-label="Package surfaces" id="tabs"></div>
+      <div class="surface-panel" id="surfacePanel" role="tabpanel">
+        <div class="surface-entry" id="surfaceEntry"></div>
+        <p class="surface-desc" id="surfaceDesc"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STACK ============ -->
+<section class="section" id="stack">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">Stack</p>
+      <h2>Four layers down</h2>
+      <p class="lede">From the wire to the database — plus a monetization plane that meters usage at the tool gate.</p>
+    </div>
+    <div class="stack-wrap">
+      <div class="layers reveal" id="layers">
+        <div class="layer">
+          <button class="layer-head" aria-expanded="true" aria-controls="l1">
+            <span class="layer-num">1</span> Transport
+            <span class="layer-caret" aria-hidden="true">›</span>
+          </button>
+          <div class="layer-body" id="l1"><div class="pill-row"><span class="pill">stdio</span><span class="pill">Streamable HTTP (MCP)</span><span class="pill">FastAPI (API / A2A)</span></div></div>
+        </div>
+        <div class="layer">
+          <button class="layer-head" aria-expanded="false" aria-controls="l2">
+            <span class="layer-num">2</span> Protocol
+            <span class="layer-caret" aria-hidden="true">›</span>
+          </button>
+          <div class="layer-body" id="l2"><div class="pill-row"><span class="pill">MCP tools / resources</span><span class="pill">A2A card</span><span class="pill">message / tasks</span></div></div>
+        </div>
+        <div class="layer">
+          <button class="layer-head" aria-expanded="false" aria-controls="l3">
+            <span class="layer-num">3</span> Domain
+            <span class="layer-caret" aria-hidden="true">›</span>
+          </button>
+          <div class="layer-body" id="l3"><div class="pill-row"><span class="pill">memory</span><span class="pill">tasks</span><span class="pill">skills</span><span class="pill">cache</span><span class="pill">policy</span><span class="pill">attestation</span><span class="pill">billing</span></div></div>
+        </div>
+        <div class="layer">
+          <button class="layer-head" aria-expanded="false" aria-controls="l4">
+            <span class="layer-num">4</span> Infrastructure
+            <span class="layer-caret" aria-hidden="true">›</span>
+          </button>
+          <div class="layer-body" id="l4"><div class="pill-row"><span class="pill">SQLite</span><span class="pill">OpenTelemetry</span><span class="pill">audit log</span><span class="pill">usage meter</span></div></div>
+        </div>
+      </div>
+      <aside class="plane reveal">
+        <h3>Monetization plane</h3>
+        <ul>
+          <li>Plan catalog — free / pro / enterprise</li>
+          <li>UsageMeter for <code>tool_call</code>, <code>memory_write</code>, <code>task_create</code></li>
+          <li>BillingService soft quotas in the tool gate</li>
+          <li>Stripe Checkout stub at <code>/api/billing/checkout</code></li>
+        </ul>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ============ QUICK START ============ -->
+<section class="section" id="quickstart">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">Quick start</p>
+      <h2>Boot it yourself</h2>
+      <p class="lede">Four commands from clone to a running kernel, API, and A2A endpoint.</p>
+    </div>
+    <div class="qs reveal">
+      <div class="qs-head"><span>bash</span></div>
+      <div class="qs-body">
+        <div class="qs-line"><code><span class="p">$</span> pip install -e ".[dev]"</code><button class="copy-btn" data-copy='pip install -e ".[dev]"'>copy</button></div>
+        <div class="qs-line"><code><span class="p">$</span> yodmcp</code><button class="copy-btn" data-copy="yodmcp">copy</button></div>
+        <div class="qs-line"><code><span class="p">$</span> yodmcp-api --port 8080</code><button class="copy-btn" data-copy="yodmcp-api --port 8080">copy</button></div>
+        <div class="qs-line"><code><span class="p">$</span> yodmcp-a2a --port 9000</code><button class="copy-btn" data-copy="yodmcp-a2a --port 9000">copy</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PLANS ============ -->
+<section class="section" id="plans">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <p class="eyebrow">Plans</p>
+      <h2>Free to boot, paid to scale</h2>
+      <p class="lede">Soft quotas are enforced at the tool gate. Upgrade when your agents outgrow them.</p>
+    </div>
+    <div class="plans-grid">
+      <div class="plan reveal">
+        <span class="plan-name">Free</span>
+        <div class="plan-price">$0<span> /mo</span></div>
+        <ul>
+          <li><b>500</b> tool calls / day</li>
+          <li>Durable storage — not included</li>
+          <li>TEE — not included</li>
+        </ul>
+        <a class="btn btn-ghost" href="https://github.com/ANAMIZED/YodMCP" target="_blank" rel="noopener">Clone the repo</a>
+      </div>
+      <div class="plan featured reveal">
+        <span class="plan-name">Pro</span>
+        <div class="plan-price">$49<span> /mo</span></div>
+        <ul>
+          <li><b>50k</b> tool calls / day</li>
+          <li><b>Durable</b> storage included</li>
+          <li>TEE — <b>simulated</b></li>
+        </ul>
+        <a class="btn btn-primary" href="https://buy.stripe.com/bJe3cw0kCaLrbVz1AY43S09" target="_blank" rel="noopener">Get Pro via Stripe</a>
+      </div>
+      <div class="plan reveal">
+        <span class="plan-name">Enterprise</span>
+        <div class="plan-price">$499<span> /mo</span></div>
+        <ul>
+          <li><b>Unlimited</b> tool calls</li>
+          <li><b>Durable</b> storage included</li>
+          <li>TEE — <b>Nitro / SGX hooks</b></li>
+        </ul>
+        <a class="btn btn-ghost" href="https://buy.stripe.com/9B68wQ1oGcTz9NrfrO43S0a" target="_blank" rel="noopener">Get Enterprise via Stripe</a>
+      </div>
+    </div>
+
+    <div class="fund reveal">
+      <h3>Non-custodial USDC — preferred for agents</h3>
+      <p class="fund-sub">Canonical addresses live in <a href="https://github.com/ANAMIZED/YodMCP/blob/main/funding/addresses.json" target="_blank" rel="noopener">funding/addresses.json</a>. Always verify against the repo before sending.</p>
+      <div class="addr-row">
+        <span class="addr-net">Base</span>
+        <span class="addr-val">0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438</span>
+        <button class="copy-btn" data-copy="0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438">copy</button>
+        <a class="addr-link" href="https://basescan.org/address/0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438" target="_blank" rel="noopener">basescan ↗</a>
+      </div>
+      <div class="addr-row">
+        <span class="addr-net">Ethereum</span>
+        <span class="addr-val">0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438</span>
+        <button class="copy-btn" data-copy="0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438">copy</button>
+        <a class="addr-link" href="https://etherscan.io/address/0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438" target="_blank" rel="noopener">etherscan ↗</a>
+      </div>
+      <div class="addr-row">
+        <span class="addr-net">Solana</span>
+        <span class="addr-val">ETQwWf19axArsY493UfC6bxe2BmEzmzvCb58PPnC38A</span>
+        <button class="copy-btn" data-copy="ETQwWf19axArsY493UfC6bxe2BmEzmzvCb58PPnC38A">copy</button>
+        <a class="addr-link" href="https://solscan.io/account/ETQwWf19axArsY493UfC6bxe2BmEzmzvCb58PPnC38A" target="_blank" rel="noopener">solscan ↗</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div class="wrap foot-inner">
+    <div>
+      <a class="brand" href="#top"><span class="yod-mark" aria-hidden="true">י</span> YodMCP</a>
+      <p style="margin-top:10px">Apache-2.0 · Python 3.11 / 3.12 · MCP 2026-07-28</p>
+    </div>
+    <div class="foot-links">
+      <a href="https://github.com/ANAMIZED/YodMCP" target="_blank" rel="noopener">Repository</a>
+      <a href="https://github.com/ANAMIZED/YodMCP/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noopener">Architecture</a>
+      <a href="https://github.com/ANAMIZED/YodMCP/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
+      <a href="https://github.com/ANAMIZED/YodMCP/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+      <a href="https://github.com/ANAMIZED/YodMCP/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+    </div>
+    <p class="foot-small">Single-file interactive showcase built from the YodMCP README and docs. Console output is simulated in your browser — nothing is sent anywhere.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------------- terminal ---------------- */
+  var out = document.getElementById("termOut");
+  var input = document.getElementById("termInput");
+  var form = document.getElementById("termForm");
+  var termEl = document.getElementById("term");
+  var bootTimers = [];
+  var history = [];
+  var histIdx = -1;
+
+  function esc(s){
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  function scrollBottom(){ out.scrollTop = out.scrollHeight; }
+  function line(html, cls){
+    var d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.innerHTML = html;
+    out.appendChild(d);
+    scrollBottom();
+    return d;
+  }
+  function pad(s, n){ s = String(s); while (s.length < n) s += " "; return s; }
+
+  var BOOT = [
+    '<span class="k">YodMCP</span> kernel <span class="k">0.4.0</span> <span class="dim">(MCP 2026-07-28)</span>',
+    '<span class="ok">[ OK ]</span> transport   <span class="dim">stdio · streamable-http</span>',
+    '<span class="ok">[ OK ]</span> memd        <span class="dim">multi-graph memory mounted</span>',
+    '<span class="ok">[ OK ]</span> taskd       <span class="dim">task scheduler online</span>',
+    '<span class="ok">[ OK ]</span> skillsd     <span class="dim">skills:// resources indexed</span>',
+    '<span class="ok">[ OK ]</span> a2ad        <span class="dim">agent card served on :9000</span>',
+    '<span class="ok">[ OK ]</span> apid        <span class="dim">REST + OpenAPI on :8080</span>',
+    '<span class="ok">[ OK ]</span> attestd     <span class="dim">TEE hooks registered</span>',
+    '<span class="ok">[ OK ]</span> otel        <span class="dim">traces + metrics exporting</span>',
+    '<span class="ok">[ OK ]</span> cached      <span class="dim">warm</span>',
+    '<span class="ok">[ OK ]</span> billd       <span class="dim">plan catalog loaded — free / pro / enterprise</span>',
+    '&nbsp;',
+    'yod ready. type <span class="cmd">help</span> or tap a command below. <span class="cursor"></span>'
+  ];
+
+  function clearBoot(){
+    bootTimers.forEach(clearTimeout);
+    bootTimers = [];
+  }
+  function boot(){
+    clearBoot();
+    out.innerHTML = "";
+    if (reduceMotion){
+      BOOT.forEach(function(l){ line(l); });
+      return;
+    }
+    var t = 120;
+    BOOT.forEach(function(l, i){
+      bootTimers.push(setTimeout(function(){ line(l); }, t));
+      t += (i === 0 ? 340 : 130 + Math.random() * 140);
+    });
+  }
+
+  var SURFACES = [
+    ["MCP",          "python -m yodmcp   ·   yodmcp",              "The kernel itself over stdio or Streamable HTTP — plug it into any MCP client."],
+    ["CLI",          "yodmcp · yodmcp-a2a · yodmcp-api",           "Three console scripts installed with the package."],
+    ["API",          "yodmcp-api --port 8080",                     "REST with OpenAPI docs, including the billing endpoints."],
+    ["A2A",          "yodmcp-a2a --port 9000",                     "Agent Card plus message and task exchange with other agents."],
+    ["SDK",          "from yodmcp.sdk import YodClient",           "A typed HTTP client for talking to the server from Python."],
+    ["Skills",       "skills://  +  skills/*/SKILL.md",            "Agent Skills served as MCP resources, defined in SKILL.md files."],
+    ["CI",           ".github/workflows/ci.yml",                   "GitHub Actions matrix on Python 3.11 and 3.12."],
+    ["Billing",      "/api/billing/*",                             "Free / Pro / Enterprise plans, plus USDC for agents."]
+  ];
+
+  function cmdHelp(){
+    line('<span class="dim">available commands</span>');
+    [["help","this list"],
+     ["status","kernel process table"],
+     ["surfaces","every way into the package"],
+     ["arch","the four layers"],
+     ["plans","free · pro · enterprise"],
+     ["whoami","current session"],
+     ["repo","link to the source"],
+     ["boot","replay the boot sequence"],
+     ["clear","wipe the screen"]].forEach(function(c){
+      line('  <span class="cmd">' + pad(c[0], 10) + '</span><span class="dim">' + c[1] + '</span>');
+    });
+  }
+  function cmdStatus(){
+    line('<span class="dim">' + pad("UNIT",10) + pad("STATE",10) + 'DETAIL</span>');
+    [["kernel","running","MCP 2026-07-28"],
+     ["memd","running","multi-graph memory"],
+     ["taskd","running","task scheduler"],
+     ["skillsd","running","skills:// index"],
+     ["a2ad","running","agent card :9000"],
+     ["apid","running","REST + OpenAPI :8080"],
+     ["attestd","armed","TEE hooks"],
+     ["otel","running","traces · metrics"],
+     ["cached","running","warm"],
+     ["billd","running","plan: free · 500 calls/day"]].forEach(function(r){
+      line(pad(r[0],10) + '<span class="ok">' + pad(r[1],10) + '</span><span class="dim">' + r[2] + '</span>');
+    });
+  }
+  function cmdSurfaces(){
+    SURFACES.forEach(function(s){
+      line('<span class="k">' + pad(s[0], 9) + '</span>' + esc(s[1]));
+    });
+    line('<span class="dim">details in the Surfaces section below.</span>');
+  }
+  function cmdArch(){
+    line('<span class="k">1 transport</span>       <span class="dim">stdio · streamable-http · fastapi</span>');
+    line('<span class="k">2 protocol</span>        <span class="dim">mcp tools/resources · a2a card · message/tasks</span>');
+    line('<span class="k">3 domain</span>          <span class="dim">memory · tasks · skills · cache · policy · attestation · billing</span>');
+    line('<span class="k">4 infrastructure</span>  <span class="dim">sqlite · otel · audit log · usage meter</span>');
+    line('<span class="dim">+ monetization plane: soft quotas metered at the tool gate</span>');
+  }
+  function cmdPlans(){
+    line('<span class="k">free</span>        $0    <span class="dim">500 tool calls/day</span>');
+    line('<span class="k">pro</span>         $49   <span class="dim">50k/day · durable · tee simulated</span>');
+    line('<span class="k">enterprise</span>  $499  <span class="dim">unlimited · durable · nitro/sgx hooks</span>');
+    line('<span class="dim">checkout links in the Plans section below.</span>');
+  }
+  function cmdWhoami(){
+    line('guest · plan=<span class="k">free</span> · tool_calls=<span class="k">500/day</span> · durable=<span class="dim">off</span> · tee=<span class="dim">off</span>');
+  }
+  function cmdRepo(){
+    line('<a href="https://github.com/ANAMIZED/YodMCP" target="_blank" rel="noopener">github.com/ANAMIZED/YodMCP</a>');
+  }
+
+  var COMMANDS = {
+    help: cmdHelp,
+    status: cmdStatus,
+    surfaces: cmdSurfaces,
+    arch: cmdArch,
+    plans: cmdPlans,
+    whoami: cmdWhoami,
+    repo: cmdRepo,
+    boot: boot,
+    clear: function(){ clearBoot(); out.innerHTML = ""; }
+  };
+
+  function run(raw){
+    var cmd = raw.trim().toLowerCase();
+    if (!cmd) return;
+    if (cmd !== "clear" && cmd !== "boot"){
+      line('<span class="dim">guest@yod:~$</span> <span class="cmd">' + esc(raw.trim()) + '</span>');
+    }
+    if (COMMANDS[cmd]){
+      COMMANDS[cmd]();
+    } else {
+      line('<span class="err">yod: command not found: ' + esc(cmd) + '</span> <span class="dim">— try</span> <span class="cmd">help</span>');
+    }
+    history.push(raw.trim());
+    histIdx = history.length;
+    scrollBottom();
+  }
+
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    run(input.value);
+    input.value = "";
+  });
+  input.addEventListener("keydown", function(e){
+    if (e.key === "ArrowUp"){
+      if (histIdx > 0){ histIdx--; input.value = history[histIdx] || ""; }
+      e.preventDefault();
+    } else if (e.key === "ArrowDown"){
+      if (histIdx < history.length){ histIdx++; input.value = history[histIdx] || ""; }
+      e.preventDefault();
+    }
+  });
+  document.getElementById("chips").addEventListener("click", function(e){
+    var b = e.target.closest("[data-cmd]");
+    if (b) run(b.getAttribute("data-cmd"));
+  });
+  // focus input when clicking terminal body on pointer devices only (avoid popping mobile keyboards)
+  if (window.matchMedia("(hover: hover)").matches){
+    termEl.addEventListener("click", function(e){
+      if (!e.target.closest("a")) input.focus();
+    });
+  }
+  boot();
+
+  /* ---------------- surfaces tabs ---------------- */
+  var tabsEl = document.getElementById("tabs");
+  var entryEl = document.getElementById("surfaceEntry");
+  var descEl = document.getElementById("surfaceDesc");
+  SURFACES.forEach(function(s, i){
+    var b = document.createElement("button");
+    b.className = "tab";
+    b.setAttribute("role","tab");
+    b.setAttribute("aria-selected", i === 0 ? "true" : "false");
+    b.textContent = s[0];
+    b.addEventListener("click", function(){ selectTab(i); });
+    tabsEl.appendChild(b);
+  });
+  function selectTab(i){
+    Array.prototype.forEach.call(tabsEl.children, function(b, j){
+      b.setAttribute("aria-selected", j === i ? "true" : "false");
+    });
+    entryEl.textContent = SURFACES[i][1];
+    descEl.textContent = SURFACES[i][2];
+  }
+  selectTab(0);
+
+  /* ---------------- stack accordion ---------------- */
+  document.querySelectorAll(".layer-head").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var open = btn.getAttribute("aria-expanded") === "true";
+      btn.setAttribute("aria-expanded", open ? "false" : "true");
+    });
+  });
+
+  /* ---------------- copy buttons ---------------- */
+  document.addEventListener("click", function(e){
+    var b = e.target.closest("[data-copy]");
+    if (!b) return;
+    var text = b.getAttribute("data-copy");
+    function done(){
+      var prev = b.textContent;
+      b.textContent = "copied";
+      b.classList.add("done");
+      setTimeout(function(){ b.textContent = prev; b.classList.remove("done"); }, 1400);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(done, function(){ fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  });
+  function fallbackCopy(text, done){
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); done(); } catch(_) {}
+    document.body.removeChild(ta);
+  }
+
+  /* ---------------- scroll reveal ---------------- */
+  var reveals = document.querySelectorAll(".reveal");
+  if (reduceMotion || !("IntersectionObserver" in window)){
+    reveals.forEach(function(el){ el.classList.add("in"); });
+  } else {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (en.isIntersecting){ en.target.classList.add("in"); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.12 });
+    reveals.forEach(function(el){ io.observe(el); });
+  }
+})();
+</script>
+</body>
+</html>
