@@ -1,4 +1,4 @@
-"""Policy/attestation/audit/tracing gate for tool calls."""
+"""Policy / attestation / audit / OTEL / billing gate for tool calls."""
 
 from __future__ import annotations
 
@@ -31,6 +31,14 @@ def _gated(tool_name: str, arguments: dict[str, Any] | None = None):
     )
     if not decision.allowed:
         end_span(span, ok=False, error=decision.reason)
-    else:
-        end_span(span, ok=True)
+        return ctx, decision
+
+    quota = ctx.billing.record_and_check("tool_call", metadata={"tool": tool_name})
+    if not quota.allowed:
+        decision.allowed = False
+        decision.reason = quota.reason
+        end_span(span, ok=False, error=quota.reason)
+        return ctx, decision
+
+    end_span(span, ok=True)
     return ctx, decision
