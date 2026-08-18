@@ -10,6 +10,34 @@ services:
       YODMCP_ATTEST_MODE: simulated_tee
     volumes:
       - yodmcp-data:/data
+    command: ["yodmcp-api", "--host", "0.0.0.0", "--port", "8080"]
+
+  yodmcp-a2a:
+    build: .
+    ports:
+      - "9000:9000"
+    environment:
+      YODMCP_MEMORY_BACKEND: sqlite
+      YODMCP_MEMORY_DB: /data/yodmcp_memory.db
+      YODMCP_PLAN: free
+      YODMCP_ATTEST_MODE: simulated_tee
+    volumes:
+      - yodmcp-data:/data
+    command: ["yodmcp-a2a", "--host", "0.0.0.0", "--port", "9000"]
+
+  # MCP Streamable HTTP (for remote MCP clients). For local Cursor/Claude, prefer stdio via npx/pip.
+  yodmcp-mcp:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      YODMCP_MEMORY_BACKEND: sqlite
+      YODMCP_MEMORY_DB: /data/yodmcp_memory.db
+      YODMCP_PLAN: free
+      YODMCP_ATTEST_MODE: simulated_tee
+    volumes:
+      - yodmcp-data:/data
+    command: ["yodmcp", "--http", "--host", "0.0.0.0", "--port", "8000"]
 
 volumes:
   yodmcp-data:
