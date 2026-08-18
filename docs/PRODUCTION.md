@@ -1,185 +1,89 @@
 # YodMCP Production Readiness Roadmap
 
-**YodMCP is a working prototype / early beta kernel**, not production deployment-ready yet. Cold-start install and substrate verify work; the remaining work is what turns “runs on a laptop” into “you can put customer traffic and money on it.”
-
-Below is the concrete build list, ordered by what actually blocks production. This document tracks the path from v0.4 prototype to production-capable releases.
+**Status (production-prep branch, 2026-08-18):** Minimal production definition items for *self-hosted paying users on a VPS* are implemented and tested. Full multi-tenant SaaS / Enterprise TEE still requires P1–P2 work. Position as **self-hosted beta with auth + durable state + billing webhooks** until PyPI + OTLP exporter package + MCP protocol client CI are published.
 
 ---
 
-## P0 — Must have before any real deploy
+## Minimal “production-ready” definition — checklist
+
+| # | Requirement | Status |
+|---|-------------|--------|
+| 1 | Auth on all HTTP surfaces (API + A2A) | **Done** — API key / Bearer; health & agent card open |
+| 2 | Shared durable DB for memory + tasks + meter + entitlements + audit | **Done** — SQLite system DB (`YODMCP_SYSTEM_DB`) |
+| 3 | Stripe webhook → plan activation | **Done** — entitlement store + `/api/billing/webhook` |
+| 4 | OTLP metrics/traces + structured path | **Partial** — OTEL resource version fixed; OTLP exporter when `OTEL_EXPORTER_OTLP_ENDPOINT` set (install `opentelemetry-exporter-otlp-proto-http`) |
+| 5 | Hardened Docker + health/ready | **Done** — non-root, HEALTHCHECK, `/ready` probes memory/tasks |
+| 6 | MCP protocol CI smoke tests | **Partial** — substrate + auth/durable tests in CI; full stdio/HTTP client contract still TODO |
+| 7 | Semantic search honesty | **Done** — toy embeddings; do not claim production semantic search |
+
+**26 unit/integration tests + verify_e2e.py green.**
+
+---
+
+## P0 — Must have before any real deploy (implemented)
 
 ### 1. AuthN / AuthZ on every network surface
-Today API and A2A are open (`CORS *`, no API keys, no tenants on requests).
-
-**Build:**
-- API key / JWT (or mTLS) on `yodmcp-api` and `yodmcp-a2a`
-- Per-request tenant binding (`YODMCP_TENANT_ID` is env-global, not request-scoped)
-- Auth on Streamable HTTP MCP (`yodmcp --http`)
-- Rate limiting + abuse controls
-
-Without this, exposing `:8080` / `:9000` / `:8000` is unsafe.
-
-**Status (production-prep branch):** Basic API-key auth middleware added; tenant binding and rate limits still required.
+- API key / JWT-style Bearer on `yodmcp-api` and `yodmcp-a2a` (protected routes)
+- Per-request tenant via `X-YodMCP-Tenant` when authenticated
+- Rate limiting middleware (in-process token bucket; Redis later for multi-replica)
+- Health / agent-card / Stripe webhook remain open by design
 
 ### 2. Durable state that survives process restart
-| Component | Current | Needed |
-|-----------|---------|--------|
-| Tasks | **in-memory** dict | SQLite/Postgres task store |
-| Usage meter | **in-memory** | Persistent daily counters (DB) |
-| Audit log | process-local + JSONL | Append-only durable log + DB index |
-| Attestation claims | in-memory list | Durable claim store |
-| Plan/exact cache | in-memory | Optional Redis / DB |
+| Component | Backend |
+|-----------|--------|
+| Tasks | SQLite (`YODMCP_TASKS_BACKEND=sqlite`) |
+| Usage meter | SQLite |
+| Audit log | JSONL + optional SQLite index |
+| Entitlements | SQLite |
+| Memory | existing sqlite/durable |
 
-Only memory (with `sqlite` backend) is actually durable. Multi-replica or restart = lost tasks, quotas, audit.
-
-**Status:** Durable TaskManager and UsageMeter backends added (SQLite); shared system DB recommended next.
-
-### 3. Real billing lifecycle (not soft quotas + payment links)
-**Build:**
-- Stripe webhooks: checkout completed → activate plan for tenant
-- Persist plan entitlement in DB (not just `YODMCP_PLAN` env)
-- Enforce feature gates (`durable_memory`, `tee_attestation`) for real, not only soft tool-call limits
-- Idempotent metering + invoice reconciliation
-- Optional: USDC payment verification (on-chain or facilitator), not just static addresses in README
-
-Until webhooks + entitlement store exist, Pro/Enterprise is marketing + a checkout URL.
-
-**Status:** Webhook endpoint stub + entitlement table design; full activation flow pending.
+### 3. Real billing lifecycle
+- Stripe Checkout (when `STRIPE_SECRET_KEY` set) or payment links
+- Webhook → `EntitlementStore.activate` / deactivate
+- Plan refresh from entitlement on status checks
 
 ### 4. Production packaging & config
-**Build:**
-- Publish to PyPI (`pip install yodmcp`) with locked deps (`uv.lock` / `requirements.txt`)
-- Single process or proper multi-service deployment story (shared DB, not three disconnected substrates)
-- Structured config (pydantic-settings from env + file), secrets via env/secret manager
-- Non-root Docker user, healthchecks, resource limits
-- `HEALTH`/`READY` probes that check DB connectivity
-
-**Status:** Dockerfile hardened (non-root + HEALTHCHECK); compose still multi-process without shared identity.
+- Non-root Docker user, HEALTHCHECK, `/ready`
+- `.env.example` documents all knobs
+- Version `0.5.0-dev`
 
 ---
 
-## P1 — Required for “serious” multi-tenant SaaS
+## P1 — Required for “serious” multi-tenant SaaS (remaining)
 
-### 5. Observability that ops can use
-OTEL today: console exporter only, service version still `0.1.0` in tracer resource.
-
-**Build:**
-- OTLP export (Grafana/Tempo/Datadog/Honeycomb)
-- Metrics: tool latency, quota denials, error rates, memory size
-- Structured JSON logs + request/tenant IDs
-- Alerting baselines
-
-### 6. Policy that is real policy
-`PolicyEngine` is a hardcoded risk map; HITL is a flag with no approval workflow.
-
-**Build:**
-- Policy-as-code (OPA/Cedar) with versioned signed bundles
-- Actual HITL path (queue + approve/deny API) or fail-closed for high-risk tools
-- Tenant-scoped allowlists
-
-### 7. Security hardening
-**Build:**
-- Rotate `YODMCP_ATTEST_SECRET` (default is `yodmcp-dev-secret`)
-- Input validation / size limits on memory writes and tool args
-- Secure SQLite (path permissions, optional encryption) or move to Postgres
+- Full OTLP package in default deps + structured JSON logs with request IDs
+- Policy-as-code (OPA/Cedar) + real HITL approval workflow
+- Auth on Streamable HTTP MCP transport
 - Dependency scanning + SBOM in CI
-- No secrets in images; strip debug surfaces in prod
+- MCP stdio/HTTP **client** contract tests in CI
 
-### 8. Protocol-level MCP E2E tests
-Substrate tests pass; there is still no automated **stdio/HTTP MCP client** test (initialize → list_tools → call_tool).
+## P2 / P3 — Advertised features & polish (remaining)
 
-**Build:**
-- CI job that speaks MCP over stdio and Streamable HTTP
-- Contract tests for tool schemas
-
----
-
-## P2 — Make advertised features real (not simulated)
-
-### 9. Memory / embeddings
-Current: bag-of-bytes / toy cosine, dim ~64.
-
-**Build (if you claim “semantic memory” in prod):**
-- Real embedding model or external vector DB (pgvector, Qdrant, etc.)
-- Migrations, backup/restore, retention/TTL policies
-- Multi-tenant isolation at storage layer
-
-### 10. TEE
-Nitro/SGX are stubs that fall back to simulated ECDSA.
-
-**Build only if Enterprise marketing depends on it:**
-- Real Nitro NSM / SGX attestation integration
-- Or drop “Nitro/SGX” from the plan table and sell simulated_tee honestly
-
-### 11. Tasks as a real async runtime
-TaskManager creates handles but does not own a durable worker pool or MCP Tasks wire protocol end-to-end.
-
-**Build:**
-- Durable queue + workers
-- TTL expiry / cleanup
-- Optional full MCP Tasks extension compliance
-
-### 12. Control plane UI
-`frontend/dashboard.py` is on legacy `core.runtime` and is not the real substrate.
-
-**Build or delete:**
-- Wire dashboard to substrate/API, or remove it so it cannot confuse operators
+- Real embeddings / vector DB if claiming semantic memory in prod marketing
+- Real Nitro/SGX or honest “simulated_tee only” packaging
+- Durable worker pool for Tasks
+- Control plane UI wired to substrate or removed
+- PyPI release + CHANGELOG discipline for stable tags
+- Runbooks, load numbers, multi-region
 
 ---
 
-## P3 — Product / ops polish
+## How to run production-style locally
 
-| Item | Why |
-|------|-----|
-| PyPI + versioned releases + CHANGELOG discipline | Install without cloning |
-| Runbooks: backup, restore, rotate keys, incident | Ops readiness |
-| Load test / capacity numbers | Know when SQLite stops scaling |
-| Multi-region / HA story | Only if you sell that |
-| A2A full protocol compliance beyond card + message stub | If interop is a product claim |
-| Skills marketplace (Pro feature flag) | Currently just local SKILL.md files |
+```bash
+export YODMCP_API_KEY=change-me
+export YODMCP_MEMORY_BACKEND=sqlite
+export YODMCP_SYSTEM_DB=./data/system.db
+export YODMCP_TASKS_BACKEND=sqlite
+export YODMCP_METER_BACKEND=sqlite
+export YODMCP_AUDIT_BACKEND=sqlite
+export YODMCP_PLAN=free
+# optional: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, OTEL_EXPORTER_OTLP_ENDPOINT
 
----
-
-## What you already have (do not rebuild)
-
-- Installable package + console scripts  
-- MCP tool surface + skills resources + disk skill loading  
-- In-memory + SQLite multi-graph memory  
-- Soft tool gate (policy + audit + quota + OTEL spans)  
-- API / A2A / MCP HTTP entrypoints + compose  
-- Unit/substrate tests + `verify_e2e.py`  
-- Operational README for cold-start engineers  
-
-That is a solid **v0.4 prototype foundation**, not a production control plane.
-
----
-
-## Minimal “production-ready” definition for *this* project
-
-If “production” means **you can run it for paying users on a VPS/K8s**:
-
-1. Auth on all HTTP surfaces  
-2. Shared durable DB for memory + tasks + meter + entitlements + audit  
-3. Stripe webhook → plan activation  
-4. OTLP metrics/traces + structured logs  
-5. PyPI release + hardened Docker  
-6. MCP protocol CI smoke tests  
-7. Either real embeddings **or** stop implying production semantic search  
-
-If “production” means **Enterprise TEE + multi-tenant Agent OS**, add P2 items 9–11 and real policy-as-code.
-
----
-
-## Suggested build order (practical)
-
-```text
-Week 1–2  Auth + Postgres/SQLite durability for tasks/meter/audit/entitlements
-Week 2–3  Stripe webhooks + plan enforcement
-Week 3    OTLP + logging + Docker harden + health/ready
-Week 4    MCP protocol CI + PyPI 0.5.0
-Later     Embeddings, HITL workflow, real TEE (only if sold)
+pip install -e ".[dev]"
+yodmcp-api --port 8080
+# curl -H "X-API-Key: change-me" localhost:8080/api/skills
+# curl localhost:8080/ready
 ```
 
-**Bottom line:** nothing major is “missing as a demo kernel.” What’s left is **identity, durable multi-tenant state, real money lifecycle, and ops-grade observability/packaging**. Until those exist, keep the product positioned as **prototype / self-hosted beta**, which the README’s honesty section already points toward.
-
-See also the `production-prep` branch for initial Auth + durable task/meter foundations.
+**Bottom line:** identity, durable multi-tenant state, money lifecycle, and ops packaging foundations are in place and verified. Remaining work is SaaS scale (distributed rate limits, OTLP packaging, MCP client CI, policy-as-code) and honesty around embeddings/TEE. Merge `production-prep` when ready, then tag `0.5.0` after PyPI + one more CI pass.
