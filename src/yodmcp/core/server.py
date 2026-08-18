@@ -10,6 +10,7 @@ from typing import Any, AsyncIterator
 from mcp.server import MCPServer
 from mcp.types import Icon
 
+from yodmcp import __version__
 from yodmcp.core.substrate import init_substrate
 from yodmcp.core.context import get_context
 from yodmcp.tools import register_core_tools
@@ -21,7 +22,7 @@ logger = logging.getLogger("yodmcp.core")
 @asynccontextmanager
 async def lifespan(server: MCPServer) -> AsyncIterator[dict[str, Any]]:
     ctx = init_substrate(console_tracing=False)
-    logger.info("YodMCP substrate ready")
+    logger.info("YodMCP substrate ready version=%s", __version__)
     yield {
         "memory": ctx.memory,
         "policy": ctx.policy,
@@ -43,13 +44,17 @@ def create_server() -> MCPServer:
             "Agent Operating System on MCP 2026-07-28. Multi-graph memory, "
             "Tasks, Skills-over-MCP, A2A, semantic/plan cache, cMCP attestation, OTEL."
         ),
-        version="0.4.0",
+        version=__version__,
         instructions=(
             "Prefer high-level tools. Use memory_* , tasks_* , skills_list, "
             "a2a_card, plan_cache_*. High-risk actions emit TRACE claims."
         ),
         website_url="https://github.com/ANAMIZED/YodMCP",
-        icons=[Icon(src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzAwN2JmZiIgZD0iTTEyIDJMMiA3djEwYzAgNS41IDMuODQgMTAuNzQgOSAxMiA1LjE2LTEuMjYgOS02LjUgOS0xMlY3bC0xMC01eiIvPjwvc3ZnPg==")],
+        icons=[
+            Icon(
+                src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzAwN2JmZiIgZD0iTTEyIDJMMiA3djEwYzAgNS41IDMuODQgMTAuNzQgOSAxMiA1LjE2LTEuMjYgOS02LjUgOS0xMlY3bC0xMC01eiIvPjwvc3ZnPg=="
+            )
+        ],
         lifespan=lifespan,
         debug=False,
         log_level="INFO",

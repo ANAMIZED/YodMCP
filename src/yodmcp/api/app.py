@@ -1,4 +1,4 @@
-"""Unified FastAPI app: health, A2A, governance API, billing, OpenAPI."""
+"""Unified FastAPI app: health, A2A, governance API, billing, HITL, OpenAPI."""
 
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         title="YodMCP Server OS API",
         version=__version__,
         description=(
-            "Agent Operating System API — MCP-compatible kernel with A2A, "
-            "memory, tasks, skills, attestation, and monetization. "
+            "Agent Operating System API — multi-tenant MCP kernel with A2A, "
+            "memory, tasks, skills, attestation, HITL, and monetization. "
             "When YODMCP_API_KEY(S) is set, protected routes require Bearer or X-API-Key."
         ),
         contact={"name": "YodMCP", "url": "https://github.com/ANAMIZED/YodMCP"},
@@ -49,18 +49,16 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
             "version": __version__,
             "substrate": ctx is not None,
             "auth_required": auth_required(),
-            "surfaces": ["mcp", "a2a", "api", "cli", "sdk", "billing"],
+            "surfaces": ["mcp", "a2a", "api", "cli", "sdk", "billing", "hitl"],
         }
 
     @app.get("/ready")
     async def ready():
-        """Readiness: substrate up + optional durable DB touch."""
         ctx = try_get_context()
         if ctx is None:
             return {"status": "not_ready", "reason": "substrate not initialized"}
         checks = {"substrate": True}
         try:
-            # Touch memory stats as proxy for DB connectivity when durable
             await ctx.memory.stats()
             checks["memory"] = True
         except Exception as e:
@@ -128,6 +126,7 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
+        ctx.billing.tenant_id = auth.tenant_id
         await ctx.billing.refresh_plan_from_entitlement()
         return ctx.billing.status()
 
@@ -148,7 +147,6 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         plan_id = body.get("plan_id", "pro")
         success = body.get("success_url", "http://localhost:8080/billing/success")
         cancel = body.get("cancel_url", "http://localhost:8080/billing/cancel")
-        # Bind checkout to authenticated tenant
         ctx.billing.tenant_id = auth.tenant_id
         return ctx.billing.create_checkout_stub(plan_id, success, cancel)
 
@@ -161,13 +159,81 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
 
     @app.post("/api/billing/webhook")
     async def billing_webhook(request: Request):
-        """Stripe webhook — open (signature verified when STRIPE_WEBHOOK_SECRET set)."""
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
         body = await request.body()
         sig = request.headers.get("stripe-signature")
         return await ctx.billing.handle_stripe_webhook(body, sig)
+
+    # --- HITL control plane ---
+    @app.get("/api/hitl/pending")
+    async def hitl_pending(auth: RequireAuth, limit: int = 50):
+        ctx = try_get_context()
+        if ctx is None:
+            return {"error": "substrate not initialized"}
+        hitl = getattr(ctx, "hitl", None)
+        if hitl is None:
+            return {"pending": [], "stats": {}}
+        items = hitl.list_pending(tenant_id=auth.tenant_id, limit=limit)
+        return {
+            "pending": [
+                {
+                    "id": r.id,
+                    "tenant_id": r.tenant_id,
+                    "tool_name": r.tool_name,
+                    "arguments_summary": r.arguments_summary,
+                    "risk_tier": r.risk_tier,
+                    "status": r.status.value,
+                    "created_at": r.created_at,
+                }
+                for r in items
+            ],
+            "stats": hitl.stats(),
+        }
+
+    @app.post("/api/hitl/{request_id}/decide")
+    async def hitl_decide(request_id: str, auth: RequireAuth, body: dict):
+        ctx = try_get_context()
+        if ctx is None:
+            return {"error": "substrate not initialized"}
+        hitl = getattr(ctx, "hitl", None)
+        if hitl is None:
+            return {"error": "hitl not available"}
+        approve = bool(body.get("approve", False))
+        reason = body.get("reason")
+        req = hitl.decide(
+            request_id, approve=approve, decided_by=auth.api_key_id, reason=reason
+        )
+        if req is None:
+            return {"error": "not found", "id": request_id}
+        return {
+            "id": req.id,
+            "status": req.status.value,
+            "decided_by": req.decided_by,
+            "reason": req.reason,
+        }
+
+    # --- Policy admin (tenant allow/deny) ---
+    @app.post("/api/policy/allowlist")
+    async def policy_allowlist(auth: RequireAuth, body: dict):
+        ctx = try_get_context()
+        if ctx is None:
+            return {"error": "substrate not initialized"}
+        tools = body.get("tools") or []
+        tenant = body.get("tenant_id") or auth.tenant_id
+        ctx.policy.set_tenant_allowlist(tenant, list(tools))
+        return {"tenant_id": tenant, "allowlist": tools}
+
+    @app.post("/api/policy/denylist")
+    async def policy_denylist(auth: RequireAuth, body: dict):
+        ctx = try_get_context()
+        if ctx is None:
+            return {"error": "substrate not initialized"}
+        tools = body.get("tools") or []
+        tenant = body.get("tenant_id") or auth.tenant_id
+        ctx.policy.set_tenant_denylist(tenant, list(tools))
+        return {"tenant_id": tenant, "denylist": tools}
 
     return app
 
