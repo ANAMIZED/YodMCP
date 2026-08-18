@@ -3,12 +3,22 @@
 Skills follow the SKILL.md portable format (name + description + body +
 optional scripts/references). They are discovered via resources/list and
 read via resources/read under the skills:// URI scheme.
+
+Discovery order:
+1. Built-in skills (always present)
+2. skills/*/SKILL.md relative to CWD, package root, or YODMCP_SKILLS_DIR
 """
 
 from __future__ import annotations
 
+import logging
+import os
+import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger("yodmcp.skills")
 
 
 @dataclass
@@ -38,7 +48,10 @@ class Skill:
         }
 
     def render(self) -> str:
-        header = f"---\nname: {self.name}\ndescription: {self.description}\nversion: {self.version}\n---\n\n"
+        header = (
+            f"---\nname: {self.name}\ndescription: {self.description}\n"
+            f"version: {self.version}\n---\n\n"
+        )
         return header + self.body
 
 
@@ -82,9 +95,83 @@ _BUILTIN: list[Skill] = [
 ]
 
 
+def _parse_skill_md(text: str, fallback_name: str) -> Skill | None:
+    """Parse optional YAML frontmatter + body from SKILL.md."""
+    name = fallback_name
+    description = fallback_name
+    version = "1.0.0"
+    tags: list[str] = []
+    body = text
+
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            fm, body = parts[1], parts[2].lstrip("\n")
+            for line in fm.splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if ":" not in line:
+                    continue
+                key, val = line.split(":", 1)
+                key, val = key.strip().lower(), val.strip().strip("\"'")
+                if key == "name":
+                    name = val
+                elif key == "description":
+                    description = val
+                elif key == "version":
+                    version = val
+                elif key == "tags":
+                    raw = val.strip("[]")
+                    tags = [t.strip().strip("\"'") for t in re.split(r"[, ]+", raw) if t.strip()]
+    if not body.strip():
+        body = f"# {name}\n\n{description}\n"
+    return Skill(name=name, description=description, body=body, version=version, tags=tags)
+
+
+def _candidate_skill_roots() -> list[Path]:
+    roots: list[Path] = []
+    env = os.environ.get("YODMCP_SKILLS_DIR")
+    if env:
+        roots.append(Path(env))
+    roots.append(Path.cwd() / "skills")
+    pkg = Path(__file__).resolve()
+    roots.append(pkg.parents[3] / "skills")
+    roots.append(pkg.parents[2] / "skills")
+    seen: set[str] = set()
+    out: list[Path] = []
+    for r in roots:
+        key = str(r.resolve()) if r.exists() else str(r)
+        if key not in seen:
+            seen.add(key)
+            out.append(r)
+    return out
+
+
+def load_disk_skills() -> list[Skill]:
+    found: list[Skill] = []
+    for root in _candidate_skill_roots():
+        if not root.is_dir():
+            continue
+        for skill_md in sorted(root.glob("*/SKILL.md")):
+            try:
+                text = skill_md.read_text(encoding="utf-8")
+                skill = _parse_skill_md(text, fallback_name=skill_md.parent.name)
+                if skill:
+                    found.append(skill)
+            except OSError as e:
+                logger.warning("Failed to read skill %s: %s", skill_md, e)
+        if found:
+            break
+    return found
+
+
 class SkillsRegistry:
-    def __init__(self) -> None:
+    def __init__(self, load_disk: bool = True) -> None:
         self._skills: dict[str, Skill] = {s.name: s for s in _BUILTIN}
+        if load_disk:
+            for s in load_disk_skills():
+                self._skills[s.name] = s
 
     def list_skills(self) -> list[Skill]:
         return list(self._skills.values())
