@@ -53,10 +53,10 @@ def create_a2a_app(
     if init_ctx and try_get_context() is None:
         init_substrate(console_tracing=False)
 
-    surface = A2ASurface(build_agent_card(url=card_url, version="0.3.0"))
+    surface = A2ASurface(build_agent_card(url=card_url, version="0.4.0"))
     app = FastAPI(
         title="YodMCP A2A",
-        version="0.3.0",
+        version="0.4.0",
         description="Agent2Agent surface for YodMCP Agent Operating System",
     )
     app.add_middleware(
@@ -77,7 +77,7 @@ def create_a2a_app(
         return {
             "status": "ok",
             "service": "YodMCP-A2A",
-            "version": "0.3.0",
+            "version": "0.4.0",
             "substrate": ctx is not None,
         }
 
