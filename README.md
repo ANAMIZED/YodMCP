@@ -20,25 +20,15 @@
 | **SDK** | `from yodmcp.sdk import YodClient` | HTTP client |
 | **Skills** | `skills://` + `skills/*/SKILL.md` | Agent Skills |
 | **CI** | `.github/workflows/ci.yml` | 3.11 / 3.12 |
-| **Monetization** | `/api/billing/*` | Free / Pro / Enterprise + metering |
+| **Monetization** | `/api/billing/*` | Free / Pro / Enterprise + USDC |
 
 ## Quick start
 
 ```bash
 pip install -e ".[dev]"
-yodmcp                          # MCP stdio
-yodmcp --http --port 8000
-yodmcp-api --port 8080          # unified API + billing
+yodmcp
+yodmcp-api --port 8080
 yodmcp-a2a --port 9000
-```
-
-### SDK
-
-```python
-from yodmcp.sdk import YodClient
-with YodClient("http://localhost:8080") as client:
-    print(client.health())
-    print(client.billing_plans())
 ```
 
 ## Monetization
@@ -49,10 +39,18 @@ with YodClient("http://localhost:8080") as client:
 | Pro | 49 | 50k | ✅ | simulated |
 | Enterprise | 499 | unlimited | ✅ | Nitro/SGX hooks |
 
-```bash
-YODMCP_PLAN=pro yodmcp-api
-curl -X POST localhost:8080/api/billing/checkout -H 'content-type: application/json' -d '{"plan_id":"pro"}'
-```
+- **Pro:** https://buy.stripe.com/bJe3cw0kCaLrbVz1AY43S09
+- **Enterprise:** https://buy.stripe.com/9B68wQ1oGcTz9NrfrO43S0a
+
+### Non-custodial USDC (preferred for agents)
+
+| Network | Address | Explorer |
+|---------|---------|----------|
+| **Base** | `0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438` | [basescan](https://basescan.org/address/0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438) |
+| **Ethereum** | `0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438` | [etherscan](https://etherscan.io/address/0xD3d0E9eDAe3Ac7bb199a8EAA761BdA423b878438) |
+| **Solana** | `ETQwWf19axArsY493UfC6bxe2BmEzmzvCb58PPnC38A` | [solscan](https://solscan.io/account/ETQwWf19axArsY493UfC6bxe2BmEzmzvCb58PPnC38A) |
+
+Canonical: [`funding/addresses.json`](funding/addresses.json) (same as [server-os](https://github.com/ANAMIZED/server-os))
 
 ## License
 
