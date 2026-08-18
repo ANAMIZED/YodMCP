@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -20,7 +18,6 @@ def saas_env(tmp_path, monkeypatch):
 def test_tenant_scoped_policy_denylist(saas_env):
     from yodmcp.core.substrate import init_substrate
     from yodmcp.core.tenant import set_tenant
-    from yodmcp.security.policy import PolicyEngine
 
     ctx = init_substrate()
     ctx.policy.set_tenant_denylist("t1", ["memory_write"])
@@ -34,13 +31,11 @@ def test_tenant_scoped_policy_denylist(saas_env):
 def test_hitl_enqueue_and_decide(saas_env):
     from yodmcp.core.substrate import init_substrate
     from yodmcp.api.app import create_api_app
+    from yodmcp.core.context import get_context
 
     init_substrate()
     client = TestClient(create_api_app(init_ctx=False))
     headers = {"X-API-Key": "saas-key", "X-YodMCP-Tenant": "acme"}
-
-    # Trigger high-risk path via policy + gate indirectly through hitl API after enqueue
-    from yodmcp.core.context import get_context
 
     ctx = get_context()
     req = ctx.hitl.enqueue("acme", "sandbox_exec", {"cmd": "id"}, risk_tier="code_exec")
@@ -64,10 +59,9 @@ def test_validation_rejects_huge_args(saas_env):
         validate_tool_arguments({"blob": "x" * 100_000})
 
 
-def test_structured_tenant_on_auth(saas_env):
+def test_auth_accepts_tenant_header(saas_env):
     from yodmcp.core.substrate import init_substrate
     from yodmcp.api.app import create_api_app
-    from yodmcp.core.tenant import get_tenant
 
     init_substrate()
     client = TestClient(create_api_app(init_ctx=False))
@@ -76,5 +70,7 @@ def test_structured_tenant_on_auth(saas_env):
         headers={"X-API-Key": "saas-key", "X-YodMCP-Tenant": "tenant-z"},
     )
     assert r.status_code == 200
-    # tenant set during request via auth dependency
-    assert get_tenant() in ("tenant-z", "default")  # context may clear after request
+    assert "skills" in r.json()
+
+    r = client.get("/api/skills")  # no key
+    assert r.status_code == 401
