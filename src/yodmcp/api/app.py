@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from yodmcp.a2a.server import create_a2a_app
 from yodmcp.core.context import try_get_context
 from yodmcp.core.substrate import init_substrate
+from yodmcp.security.auth import RequireAuth, auth_required
 from yodmcp import __version__
 
 
@@ -20,11 +21,13 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         version=__version__,
         description=(
             "Agent Operating System API — MCP-compatible kernel with A2A, "
-            "memory, tasks, skills, attestation, and monetization."
+            "memory, tasks, skills, attestation, and monetization. "
+            "When YODMCP_API_KEY(S) is set, protected routes require Bearer or X-API-Key."
         ),
         contact={"name": "YodMCP", "url": "https://github.com/ANAMIZED/YodMCP"},
         license_info={"name": "Apache-2.0"},
     )
+    # Restrict CORS in production via env later; keep * for beta self-host
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -44,18 +47,19 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
             "service": "YodMCP",
             "version": __version__,
             "substrate": ctx is not None,
+            "auth_required": auth_required(),
             "surfaces": ["mcp", "a2a", "api", "cli", "sdk", "billing"],
         }
 
     @app.get("/api/memory")
-    async def api_memory():
+    async def api_memory(auth: RequireAuth):
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
         return await ctx.memory.stats()
 
     @app.get("/api/audit")
-    async def api_audit(limit: int = 30):
+    async def api_audit(auth: RequireAuth, limit: int = 30):
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
@@ -77,7 +81,7 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         }
 
     @app.get("/api/skills")
-    async def api_skills():
+    async def api_skills(auth: RequireAuth):
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
@@ -91,21 +95,21 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         }
 
     @app.get("/api/attestation")
-    async def api_attestation(limit: int = 10):
+    async def api_attestation(auth: RequireAuth, limit: int = 10):
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
         return {"stats": ctx.attestation.stats(), "claims": ctx.attestation.recent(limit)}
 
     @app.get("/api/billing/status")
-    async def billing_status():
+    async def billing_status(auth: RequireAuth):
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
         return ctx.billing.status()
 
     @app.get("/api/billing/plans")
-    async def billing_plans():
+    async def billing_plans(auth: RequireAuth):
         ctx = try_get_context()
         if ctx is None:
             from yodmcp.monetization.plans import PLANS
@@ -113,7 +117,7 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         return {"plans": ctx.billing.plans_catalog(), "current": ctx.billing.plan.to_dict()}
 
     @app.post("/api/billing/checkout")
-    async def billing_checkout(body: dict):
+    async def billing_checkout(auth: RequireAuth, body: dict):
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
@@ -123,11 +127,19 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         return ctx.billing.create_checkout_stub(plan_id, success, cancel)
 
     @app.get("/api/usage")
-    async def api_usage():
+    async def api_usage(auth: RequireAuth):
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
         return ctx.billing.meter.summary(ctx.billing.tenant_id)
+
+    # Stripe webhook — signature verification + plan activation still TODO (P0.3)
+    @app.post("/api/billing/webhook")
+    async def billing_webhook(request: Request):
+        # Open for Stripe signature validation; do not require our API key
+        body = await request.body()
+        # TODO: stripe.Webhook.construct_event + activate entitlement for tenant
+        return {"received": True, "bytes": len(body), "note": "stub — implement signature + entitlement"}
 
     return app
 
