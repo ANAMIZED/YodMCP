@@ -1,13 +1,16 @@
-"""Billing service — plan gates + live Stripe Checkout / Payment Links."""
+"""Billing service — plan gates + live Stripe Checkout / Payment Links + entitlements."""
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from yodmcp.monetization.plans import get_plan
 from yodmcp.monetization.metering import UsageMeter
+
+if TYPE_CHECKING:
+    from yodmcp.monetization.entitlements import EntitlementStore
 
 # Live Stripe catalog (acct_1TO54GK7tbqokSzb — ANAMIZED)
 STRIPE_CATALOG = {
@@ -42,12 +45,23 @@ class BillingService:
         plan_id: str | None = None,
         tenant_id: str = "default",
         meter: UsageMeter | None = None,
+        entitlements: "EntitlementStore | None" = None,
     ) -> None:
         self.tenant_id = tenant_id or os.environ.get("YODMCP_TENANT_ID", "default")
         self.plan = get_plan(plan_id)
         self.meter = meter or UsageMeter()
+        self.entitlements = entitlements
         self.stripe_enabled = os.environ.get("YODMCP_STRIPE_ENABLED", "").lower() in ("1", "true", "yes")
         self.stripe_secret = os.environ.get("STRIPE_SECRET_KEY", "")
+
+    async def refresh_plan_from_entitlement(self) -> str:
+        """Load durable entitlement for tenant if present; falls back to env plan."""
+        if self.entitlements is None:
+            return self.plan.id
+        plan_id = await self.entitlements.get_plan(self.tenant_id)
+        if plan_id:
+            self.plan = get_plan(plan_id)
+        return self.plan.id
 
     def check_quota(self, metric: str) -> QuotaDecision:
         limit_map = {
@@ -109,6 +123,7 @@ class BillingService:
             "usage": self.meter.summary(self.tenant_id),
             "stripe_enabled": self.stripe_enabled or bool(self.stripe_secret),
             "catalog": STRIPE_CATALOG,
+            "entitlements_enabled": self.entitlements is not None,
         }
 
     def create_checkout_stub(
@@ -177,3 +192,55 @@ class BillingService:
             "amount_usd": cat["amount_usd"],
             "message": "Open url to subscribe. For dynamic Checkout Sessions, set STRIPE_SECRET_KEY.",
         }
+
+    async def handle_stripe_webhook(self, payload: bytes, sig_header: str | None) -> dict[str, Any]:
+        """Verify (if secret present) and activate entitlement on checkout.session.completed."""
+        secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+        event: dict[str, Any]
+
+        if secret and sig_header:
+            try:
+                import stripe
+
+                event = stripe.Webhook.construct_event(payload, sig_header, secret)
+            except Exception as e:
+                return {"ok": False, "error": f"signature verification failed: {e}"}
+        else:
+            # Dev / unsigned mode — parse JSON only
+            import json
+
+            try:
+                event = json.loads(payload)
+            except Exception as e:
+                return {"ok": False, "error": f"invalid json: {e}"}
+
+        etype = event.get("type") if isinstance(event, dict) else getattr(event, "type", None)
+        data = event.get("data", {}).get("object", {}) if isinstance(event, dict) else {}
+
+        if etype in ("checkout.session.completed", "customer.subscription.created", "customer.subscription.updated"):
+            meta = data.get("metadata") or {}
+            plan_id = meta.get("yodmcp_plan") or "pro"
+            tenant_id = meta.get("tenant_id") or self.tenant_id
+            cust = data.get("customer")
+            sub = data.get("subscription") or data.get("id")
+            if self.entitlements is not None:
+                await self.entitlements.activate(
+                    tenant_id=tenant_id,
+                    plan_id=plan_id,
+                    source="stripe",
+                    stripe_customer_id=str(cust) if cust else None,
+                    stripe_subscription_id=str(sub) if sub else None,
+                )
+                if tenant_id == self.tenant_id:
+                    self.plan = get_plan(plan_id)
+                return {"ok": True, "activated": plan_id, "tenant_id": tenant_id}
+            return {"ok": True, "note": "no entitlement store; plan not persisted", "plan_id": plan_id}
+
+        if etype in ("customer.subscription.deleted", "checkout.session.expired"):
+            meta = data.get("metadata") or {}
+            tenant_id = meta.get("tenant_id") or self.tenant_id
+            if self.entitlements is not None:
+                await self.entitlements.deactivate(tenant_id)
+            return {"ok": True, "deactivated": tenant_id}
+
+        return {"ok": True, "ignored": etype}
