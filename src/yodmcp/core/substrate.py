@@ -8,6 +8,7 @@ from yodmcp.core.context import YodContext, set_context
 from yodmcp.memory.durable import create_memory
 from yodmcp.security.policy import PolicyEngine
 from yodmcp.security.attestation import AttestationService
+from yodmcp.security.hitl import HitlQueue
 from yodmcp.observability.audit import AuditLogger
 from yodmcp.cache.layer import CacheLayer
 from yodmcp.tasks.manager import TaskManager
@@ -16,6 +17,7 @@ from yodmcp.monetization.billing import BillingService
 from yodmcp.monetization.metering import UsageMeter
 from yodmcp.monetization.entitlements import EntitlementStore
 from yodmcp.observability.otel import init_tracing
+from yodmcp.observability.logging import configure_logging
 
 
 def init_substrate(
@@ -24,6 +26,7 @@ def init_substrate(
     memory_db_path: str | None = None,
     attest_mode: str | None = None,
 ) -> YodContext:
+    configure_logging()
     init_tracing(console=console_tracing)
     backend = memory_backend or os.environ.get("YODMCP_MEMORY_BACKEND", "memory")
     db_path = memory_db_path or os.environ.get("YODMCP_MEMORY_DB", "yodmcp_memory.db")
@@ -43,6 +46,7 @@ def init_substrate(
     )
     audit = AuditLogger(db_path=system_db)
     entitlements = EntitlementStore(db_path=system_db)
+    hitl = HitlQueue()
 
     ctx = YodContext(
         memory=memory,
@@ -54,7 +58,7 @@ def init_substrate(
         skills=SkillsRegistry(),
         billing=BillingService(meter=meter, entitlements=entitlements),
     )
-    # Attach extras for operators / future use
     setattr(ctx, "entitlements", entitlements)
+    setattr(ctx, "hitl", hitl)
     set_context(ctx)
     return ctx
