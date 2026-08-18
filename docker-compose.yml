@@ -1,0 +1,15 @@
+services:
+  yodmcp-api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      YODMCP_MEMORY_BACKEND: sqlite
+      YODMCP_MEMORY_DB: /data/yodmcp_memory.db
+      YODMCP_PLAN: free
+      YODMCP_ATTEST_MODE: simulated_tee
+    volumes:
+      - yodmcp-data:/data
+
+volumes:
+  yodmcp-data:
