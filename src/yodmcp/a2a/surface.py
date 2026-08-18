@@ -14,7 +14,7 @@ def build_agent_card(
     name: str = "YodMCP",
     url: str = "http://localhost:8000/a2a",
     description: str | None = None,
-    version: str = "0.1.0",
+    version: str = "0.4.0",
 ) -> dict[str, Any]:
     """A2A Agent Card (v1.0 shape)."""
     return {
@@ -60,7 +60,7 @@ def build_agent_card(
         },
         "provider": {
             "organization": "YodMCP",
-            "url": "https://github.com/yodmcp/yodmcp",
+            "url": "https://github.com/ANAMIZED/YodMCP",
         },
     }
 
