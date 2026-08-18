@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, production-prep]
   pull_request:
     branches: [main, master]
 
@@ -28,17 +28,21 @@ jobs:
           pip install -e ".[dev]"
           pip install aiosqlite cryptography opentelemetry-api opentelemetry-sdk
 
-      - name: Unit tests
+      - name: Unit + production tests (in-memory)
         env:
           YODMCP_MEMORY_BACKEND: memory
           YODMCP_ATTEST_MODE: software
         run: |
           PYTHONPATH=src pytest tests/ -v --tb=short
 
-      - name: Durable store + simulated TEE tests
+      - name: Durable store + simulated TEE + auth tests
         env:
           YODMCP_MEMORY_BACKEND: sqlite
           YODMCP_MEMORY_DB: /tmp/yodmcp_ci_memory.db
+          YODMCP_SYSTEM_DB: /tmp/yodmcp_ci_system.db
+          YODMCP_TASKS_BACKEND: sqlite
+          YODMCP_METER_BACKEND: sqlite
+          YODMCP_AUDIT_BACKEND: sqlite
           YODMCP_ATTEST_MODE: simulated_tee
         run: |
           PYTHONPATH=src pytest tests/ -v --tb=short
