@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yodmcp"
-version = "0.3.0"
+version = "0.4.0"
 description = "YodMCP: The Ultimate Autonomous MCP Server — Agent Operating System"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "YodMCP Contributors" }]
+keywords = ["mcp", "agent", "os", "a2a", "skills"]
 dependencies = [
     "mcp>=2.0.0",
     "fastapi>=0.115",
@@ -23,12 +24,18 @@ dependencies = [
     "opentelemetry-sdk>=1.20",
 ]
 
+[project.urls]
+Homepage = "https://github.com/ANAMIZED/YodMCP"
+Repository = "https://github.com/ANAMIZED/YodMCP"
+Issues = "https://github.com/ANAMIZED/YodMCP/issues"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.6", "black>=24.0"]
 
 [project.scripts]
 yodmcp = "yodmcp.__main__:main"
 yodmcp-a2a = "yodmcp.a2a.server:main"
+yodmcp-api = "yodmcp.api.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
