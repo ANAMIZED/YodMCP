@@ -9,6 +9,7 @@ from yodmcp.a2a.server import create_a2a_app
 from yodmcp.core.context import try_get_context
 from yodmcp.core.substrate import init_substrate
 from yodmcp.security.auth import RequireAuth, auth_required
+from yodmcp.security.rate_limit import RateLimitMiddleware
 from yodmcp import __version__
 
 
@@ -27,13 +28,13 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         contact={"name": "YodMCP", "url": "https://github.com/ANAMIZED/YodMCP"},
         license_info={"name": "Apache-2.0"},
     )
-    # Restrict CORS in production via env later; keep * for beta self-host
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RateLimitMiddleware)
 
     a2a = create_a2a_app(init_ctx=False)
     for route in a2a.routes:
@@ -50,6 +51,27 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
             "auth_required": auth_required(),
             "surfaces": ["mcp", "a2a", "api", "cli", "sdk", "billing"],
         }
+
+    @app.get("/ready")
+    async def ready():
+        """Readiness: substrate up + optional durable DB touch."""
+        ctx = try_get_context()
+        if ctx is None:
+            return {"status": "not_ready", "reason": "substrate not initialized"}
+        checks = {"substrate": True}
+        try:
+            # Touch memory stats as proxy for DB connectivity when durable
+            await ctx.memory.stats()
+            checks["memory"] = True
+        except Exception as e:
+            checks["memory"] = False
+            return {"status": "not_ready", "checks": checks, "error": str(e)}
+        try:
+            await ctx.tasks.stats()
+            checks["tasks"] = True
+        except Exception:
+            checks["tasks"] = False
+        return {"status": "ready", "checks": checks, "version": __version__}
 
     @app.get("/api/memory")
     async def api_memory(auth: RequireAuth):
@@ -106,6 +128,7 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
+        await ctx.billing.refresh_plan_from_entitlement()
         return ctx.billing.status()
 
     @app.get("/api/billing/plans")
@@ -113,6 +136,7 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         ctx = try_get_context()
         if ctx is None:
             from yodmcp.monetization.plans import PLANS
+
             return {"plans": [p.to_dict() for p in PLANS.values()]}
         return {"plans": ctx.billing.plans_catalog(), "current": ctx.billing.plan.to_dict()}
 
@@ -124,6 +148,8 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         plan_id = body.get("plan_id", "pro")
         success = body.get("success_url", "http://localhost:8080/billing/success")
         cancel = body.get("cancel_url", "http://localhost:8080/billing/cancel")
+        # Bind checkout to authenticated tenant
+        ctx.billing.tenant_id = auth.tenant_id
         return ctx.billing.create_checkout_stub(plan_id, success, cancel)
 
     @app.get("/api/usage")
@@ -131,15 +157,17 @@ def create_api_app(init_ctx: bool = True) -> FastAPI:
         ctx = try_get_context()
         if ctx is None:
             return {"error": "substrate not initialized"}
-        return ctx.billing.meter.summary(ctx.billing.tenant_id)
+        return ctx.billing.meter.summary(auth.tenant_id)
 
-    # Stripe webhook — signature verification + plan activation still TODO (P0.3)
     @app.post("/api/billing/webhook")
     async def billing_webhook(request: Request):
-        # Open for Stripe signature validation; do not require our API key
+        """Stripe webhook — open (signature verified when STRIPE_WEBHOOK_SECRET set)."""
+        ctx = try_get_context()
+        if ctx is None:
+            return {"error": "substrate not initialized"}
         body = await request.body()
-        # TODO: stripe.Webhook.construct_event + activate entitlement for tenant
-        return {"received": True, "bytes": len(body), "note": "stub — implement signature + entitlement"}
+        sig = request.headers.get("stripe-signature")
+        return await ctx.billing.handle_stripe_webhook(body, sig)
 
     return app
 
