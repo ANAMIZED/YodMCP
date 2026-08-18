@@ -37,7 +37,7 @@ class CacheEntry:
 
 
 class CacheLayer:
-    def __init__(self, similarity_threshold: float = 0.92, max_entries: int = 2048) -> None:
+    def __init__(self, similarity_threshold: float = 0.68, max_entries: int = 2048) -> None:
         self.threshold = similarity_threshold
         self.max_entries = max_entries
         self._exact: dict[str, CacheEntry] = {}

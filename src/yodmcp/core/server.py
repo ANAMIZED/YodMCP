@@ -43,12 +43,12 @@ def create_server() -> MCPServer:
             "Agent Operating System on MCP 2026-07-28. Multi-graph memory, "
             "Tasks, Skills-over-MCP, A2A, semantic/plan cache, cMCP attestation, OTEL."
         ),
-        version="0.2.0",
+        version="0.4.0",
         instructions=(
             "Prefer high-level tools. Use memory_* , tasks_* , skills_list, "
             "a2a_card, plan_cache_*. High-risk actions emit TRACE claims."
         ),
-        website_url="https://github.com/yodmcp/yodmcp",
+        website_url="https://github.com/ANAMIZED/YodMCP",
         icons=[Icon(src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzAwN2JmZiIgZD0iTTEyIDJMMiA3djEwYzAgNS41IDMuODQgMTAuNzQgOSAxMiA1LjE2LTEuMjYgOS02LjUgOS0xMlY3bC0xMC01eiIvPjwvc3ZnPg==")],
         lifespan=lifespan,
         debug=False,

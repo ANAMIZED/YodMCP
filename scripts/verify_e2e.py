@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exhaustive end-to-end verification of YodMCP v0.2 substrate."""
+"""Exhaustive end-to-end verification of YodMCP v0.4 substrate."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from yodmcp.a2a.surface import build_agent_card
 
 
 async def main() -> None:
-    print("=== YodMCP v0.2 Exhaustive E2E Verification ===\n")
+    print("=== YodMCP v0.4 Exhaustive E2E Verification ===\n")
     init_substrate(console_tracing=False)
     server = create_server()
     ctx = get_context()
@@ -43,6 +43,7 @@ async def main() -> None:
     ctx.cache.put_plan("deploy yodmcp", {"steps": ["build", "test", "ship"]})
     plan, score = ctx.cache.get_plan("deploy the yodmcp service")
     print(f"4. Plan cache → found={plan is not None}, score={score:.3f}")
+    assert plan is not None, f"plan cache miss score={score}"
 
     handle = ctx.tasks.to_handle(await ctx.tasks.create(tool_name="e2e"))
     assert handle["resultType"] == "task"
@@ -64,7 +65,7 @@ async def main() -> None:
     ctx.audit.record("e2e", tool_name="verify", decision="pass", outcome="success")
     print(f"9. Audit → events={ctx.audit.stats()['total_events']}")
 
-    print("\n✅ ALL E2E CHECKS PASSED — YodMCP v0.2 substrate is operational.")
+    print("\n✅ ALL E2E CHECKS PASSED — YodMCP v0.4 substrate is operational.")
 
 
 if __name__ == "__main__":
