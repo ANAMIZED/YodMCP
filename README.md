@@ -204,10 +204,13 @@ Built-in skills are always registered. **Disk skills** under `skills/*/SKILL.md`
 - Soft quotas via tool gate; upgrade messaging on exhaustion
 - Live Stripe Checkout when `STRIPE_SECRET_KEY` is set; otherwise checkout returns `status: payment_link`
 
-| Plan | Link |
+| Option | Link |
 |------|------|
-| Pro | https://buy.stripe.com/bJe3cw0kCaLrbVz1AY43S09 |
-| Enterprise | https://buy.stripe.com/9B68wQ1oGcTz9NrfrO43S0a |
+| **YodMCP Pro** | https://buy.stripe.com/bJe3cw0kCaLrbVz1AY43S09 |
+| **YodMCP Enterprise** | https://buy.stripe.com/9B68wQ1oGcTz9NrfrO43S0a |
+| **Agentic OS Kernel Support** ($99) | https://buy.stripe.com/bJecN63wObPv6Bf7Zm43S02 |
+| **Public Goods Support** ($25) | https://donate.stripe.com/00w5kE3wOg5L8Jn2F243S00 |
+| **Agentic Systems Consulting Hour** ($199) | https://buy.stripe.com/dRmaEYgjA9Hnf7LdjG43S0b |
 
 ### Non-custodial USDC (preferred for agents)
 
