@@ -1,12 +1,12 @@
-"""Policy engine for YodMCP — least-privilege, risk-tiered gates.
+"""Policy engine with tenant-scoped allowlists and HITL flags.
 
-Prototype. Production uses Cedar/OPA-style policy-as-code inside TEE
-(cMCP pattern) with signed TRACE Claims.
+Prototype ruleset; production path is policy-as-code (OPA/Cedar) bundles.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
@@ -14,9 +14,9 @@ from typing import Any
 class RiskTier(str, Enum):
     READ = "read"
     WRITE = "write"
-    DESTRUCTIVE = "destructive"
     NETWORK = "network"
     CODE_EXEC = "code_exec"
+    DESTRUCTIVE = "destructive"
     HIGH_PRIVILEGE = "high_privilege"
 
 
@@ -29,9 +29,11 @@ class PolicyDecision:
 
 
 class PolicyEngine:
-    """Simple rule-based policy for prototype.
+    """Rule-based policy with optional per-tenant allow/deny lists.
 
-    Production: replace with verified policy bundle + hardware attestation.
+    Env:
+      YODMCP_TENANT_ALLOWLIST — comma tool names allowed for *all* tenants when set
+      Per-tenant: set via set_tenant_allowlist / block_tool at runtime
     """
 
     def __init__(self) -> None:
@@ -58,6 +60,20 @@ class PolicyEngine:
             "delegate_task": RiskTier.HIGH_PRIVILEGE,
         }
         self._blocked: set[str] = set()
+        # tenant_id -> allowed tool names (empty = use default rules)
+        self._tenant_allow: dict[str, set[str]] = {}
+        self._tenant_deny: dict[str, set[str]] = {}
+        global_allow = os.environ.get("YODMCP_TOOL_ALLOWLIST", "")
+        if global_allow.strip():
+            self._global_allow = {t.strip() for t in global_allow.split(",") if t.strip()}
+        else:
+            self._global_allow = set()
+
+    def set_tenant_allowlist(self, tenant_id: str, tools: list[str]) -> None:
+        self._tenant_allow[tenant_id] = set(tools)
+
+    def set_tenant_denylist(self, tenant_id: str, tools: list[str]) -> None:
+        self._tenant_deny[tenant_id] = set(tools)
 
     def evaluate_tool_call(
         self,
@@ -65,13 +81,44 @@ class PolicyEngine:
         arguments: dict[str, Any],
         agent_id: str | None = None,
         session_id: str | None = None,
+        tenant_id: str | None = None,
     ) -> PolicyDecision:
+        from yodmcp.core.tenant import get_tenant
+
+        tid = tenant_id or get_tenant()
+
         if tool_name in self._blocked:
             return PolicyDecision(
                 allowed=False,
                 reason=f"Tool {tool_name} is blocked by policy",
                 risk_tier=RiskTier.HIGH_PRIVILEGE,
                 requires_hitl=True,
+            )
+
+        deny = self._tenant_deny.get(tid) or set()
+        if tool_name in deny:
+            return PolicyDecision(
+                allowed=False,
+                reason=f"Tool {tool_name} denied for tenant {tid}",
+                risk_tier=RiskTier.HIGH_PRIVILEGE,
+                requires_hitl=False,
+            )
+
+        allow = self._tenant_allow.get(tid)
+        if allow is not None and tool_name not in allow:
+            return PolicyDecision(
+                allowed=False,
+                reason=f"Tool {tool_name} not on allowlist for tenant {tid}",
+                risk_tier=RiskTier.HIGH_PRIVILEGE,
+                requires_hitl=False,
+            )
+
+        if self._global_allow and tool_name not in self._global_allow:
+            return PolicyDecision(
+                allowed=False,
+                reason=f"Tool {tool_name} not on global allowlist",
+                risk_tier=RiskTier.HIGH_PRIVILEGE,
+                requires_hitl=False,
             )
 
         risk = self._tool_risk.get(tool_name, RiskTier.HIGH_PRIVILEGE)

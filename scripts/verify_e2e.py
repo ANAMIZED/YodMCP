@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""Exhaustive end-to-end verification of YodMCP v0.4 substrate."""
+"""Exhaustive end-to-end verification of YodMCP substrate."""
 
 from __future__ import annotations
 
 import asyncio
 import sys
+
 sys.path.insert(0, "src")
 
+from yodmcp import __version__
 from yodmcp.core.substrate import init_substrate
 from yodmcp.core.context import get_context
 from yodmcp.core.server import create_server
@@ -14,7 +16,7 @@ from yodmcp.a2a.surface import build_agent_card
 
 
 async def main() -> None:
-    print("=== YodMCP v0.4 Exhaustive E2E Verification ===\n")
+    print(f"=== YodMCP v{__version__} Exhaustive E2E Verification ===\n")
     init_substrate(console_tracing=False)
     server = create_server()
     ctx = get_context()
@@ -24,10 +26,22 @@ async def main() -> None:
     names = sorted(t.name for t in tools)
     print(f"1. Tools ({len(names)}): {names}")
     required = {
-        "memory_write", "memory_read", "memory_consolidate", "memory_stats",
-        "tasks_create", "tasks_get", "tasks_cancel", "skills_list",
-        "a2a_card", "plan_cache_get", "plan_cache_put", "attestation_recent",
-        "audit_recent", "cache_stats", "echo", "discover_capabilities",
+        "memory_write",
+        "memory_read",
+        "memory_consolidate",
+        "memory_stats",
+        "tasks_create",
+        "tasks_get",
+        "tasks_cancel",
+        "skills_list",
+        "a2a_card",
+        "plan_cache_get",
+        "plan_cache_put",
+        "attestation_recent",
+        "audit_recent",
+        "cache_stats",
+        "echo",
+        "discover_capabilities",
     }
     missing = required - set(names)
     assert not missing, f"Missing tools: {missing}"
@@ -35,7 +49,7 @@ async def main() -> None:
     id1 = await ctx.memory.write("YodMCP multi-graph online", importance=0.95, entities=["YodMCP"])
     id2 = await ctx.memory.write("Causal follow-up", importance=0.8, causal_parent=id1)
     items = await ctx.memory.read(query="multi-graph", limit=3)
-    print(f"2. Memory write/read → {len(items)} hits, nodes={ (await ctx.memory.stats())['nodes'] }")
+    print(f"2. Memory write/read → {len(items)} hits, nodes={(await ctx.memory.stats())['nodes']}")
     assert len(items) >= 1
     promoted = await ctx.memory.consolidate()
     print(f"3. Consolidate → promoted {promoted}")
@@ -65,7 +79,7 @@ async def main() -> None:
     ctx.audit.record("e2e", tool_name="verify", decision="pass", outcome="success")
     print(f"9. Audit → events={ctx.audit.stats()['total_events']}")
 
-    print("\n✅ ALL E2E CHECKS PASSED — YodMCP v0.4 substrate is operational.")
+    print(f"\n✅ ALL E2E CHECKS PASSED — YodMCP v{__version__} substrate is operational.")
 
 
 if __name__ == "__main__":

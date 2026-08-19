@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, production-prep]
   pull_request:
     branches: [main, master]
 
@@ -28,25 +28,44 @@ jobs:
           pip install -e ".[dev]"
           pip install aiosqlite cryptography opentelemetry-api opentelemetry-sdk
 
-      - name: Unit tests
+      - name: Unit + SaaS tests (in-memory)
         env:
           YODMCP_MEMORY_BACKEND: memory
           YODMCP_ATTEST_MODE: software
         run: |
           PYTHONPATH=src pytest tests/ -v --tb=short
 
-      - name: Durable store + simulated TEE tests
+      - name: Durable + multi-tenant + TEE tests
         env:
           YODMCP_MEMORY_BACKEND: sqlite
           YODMCP_MEMORY_DB: /tmp/yodmcp_ci_memory.db
+          YODMCP_SYSTEM_DB: /tmp/yodmcp_ci_system.db
+          YODMCP_TASKS_BACKEND: sqlite
+          YODMCP_METER_BACKEND: sqlite
+          YODMCP_AUDIT_BACKEND: sqlite
           YODMCP_ATTEST_MODE: simulated_tee
         run: |
           PYTHONPATH=src pytest tests/ -v --tb=short
           PYTHONPATH=src python scripts/verify_e2e.py
 
-      - name: E2E verification (in-memory + software attest)
+      - name: E2E verification (in-memory)
         env:
           YODMCP_MEMORY_BACKEND: memory
           YODMCP_ATTEST_MODE: software
         run: |
           PYTHONPATH=src python scripts/verify_e2e.py
+
+      - name: Dependency audit (best-effort SBOM hygiene)
+        continue-on-error: true
+        run: |
+          pip install pip-audit -q
+          pip-audit || true
+          pip freeze > sbom-requirements.txt
+          echo "Captured pip freeze as lightweight SBOM artifact"
+
+      - name: Upload freeze SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-requirements-py${{ matrix.python-version }}
+          path: sbom-requirements.txt
+          if-no-files-found: ignore
