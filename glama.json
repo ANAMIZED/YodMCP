@@ -1,0 +1,12 @@
+{
+  "$schema": "https://glama.ai/mcp/schemas/server.json",
+  "maintainers": [
+    "ANAMIZED"
+  ],
+  "name": "yodmcp",
+  "displayName": "YodMCP",
+  "description": "Autonomous MCP Agent OS: multi-graph memory, Tasks, Skills, A2A, attestation, OpenTelemetry.",
+  "repository": "https://github.com/ANAMIZED/YodMCP",
+  "license": "Apache-2.0",
+  "version": "0.5.0"
+}

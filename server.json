@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ANAMIZED/yodmcp",
+  "description": "Autonomous MCP Agent OS: multi-graph memory, Tasks, Skills, A2A, attestation, OpenTelemetry.",
+  "repository": {
+    "url": "https://github.com/ANAMIZED/YodMCP",
+    "source": "github"
+  },
+  "version": "0.5.0",
+  "websiteUrl": "https://github.com/ANAMIZED/YodMCP",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "yodmcp",
+      "version": "0.5.0",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
