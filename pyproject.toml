@@ -45,3 +45,4 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src"]
 timeout = 30
+timeout_method = "thread"
