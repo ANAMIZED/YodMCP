@@ -52,7 +52,7 @@ x402 rail: [x402-cloudflare-starter](https://github.com/ANAMIZED/x402-cloudflare
 ```bash
 git clone https://github.com/ANAMIZED/YodMCP.git
 cd YodMCP
-python -m venv .venv && source .venv.bin/activate   # recommended
+python -m venv .venv && source .venv/bin/activate   # recommended
 pip install -e ".[dev]"
 ```
 
