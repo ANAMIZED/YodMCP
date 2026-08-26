@@ -127,6 +127,27 @@ async def test_memory_delete_and_plan_cache_delete():
     assert ctx.cache.delete_plan("ship kernel") is False
 
 
+SIBLING_HINTS = (
+    "memory_write", "memory_read", "memory_delete", "memory_consolidate",
+    "memory_stats", "plan_cache_get", "plan_cache_put", "plan_cache_delete",
+    "tasks_create", "tasks_get", "tasks_list", "tasks_update", "tasks_cancel",
+    "tasks_stats", "skills_list", "a2a_card", "discover_capabilities",
+    "audit_recent", "attestation_recent", "cache_stats", "echo",
+)
+
+
+@pytest.mark.asyncio
+async def test_usage_guidelines_name_a_sibling(server):
+    tools = await _list_tools(server)
+    missing = []
+    for t in tools:
+        desc = getattr(t, "description", "") or ""
+        others = [n for n in SIBLING_HINTS if n != t.name]
+        if not any(n in desc for n in others):
+            missing.append(t.name)
+    assert not missing, f"no sibling named in description: {missing}"
+
+
 @pytest.mark.asyncio
 async def test_tasks_list_and_update():
     init_substrate(console_tracing=False)

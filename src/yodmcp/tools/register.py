@@ -394,8 +394,8 @@ def register_core_tools(server: MCPServer) -> None:
         title="Delete a cached plan",
         description=(
             "Delete the exact plan-cache entry for task_description. Use to drop a stale template. "
-            "Does not delete memory nodes. Destructive and idempotent: missing keys return "
-            "deleted=false. Auth: tool policy gate."
+            "Does not delete memory nodes (that is memory_delete). Destructive and idempotent: "
+            "missing keys return deleted=false. Auth: tool policy gate."
         ),
         annotations=tool_hints("Delete a cached plan", **_DEL),
     )
