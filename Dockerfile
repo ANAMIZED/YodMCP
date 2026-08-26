@@ -1,29 +1,32 @@
+# Glama inspects MCP over stdio. Do not start yodmcp-api here.
+# Admin generator: build ["pip install --no-cache-dir ."]
+#                  CMD   ["python", "-m", "yodmcp"]
 FROM python:3.12-slim
 
-# Non-root user for production safety
-RUN useradd --create-home --shell /bin/bash --uid 10001 yodmcp
-
 WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 COPY skills ./skills
 
-RUN pip install --no-cache-dir -e . \
+RUN pip install --no-cache-dir . \
+    && useradd --create-home --uid 10001 --shell /usr/sbin/nologin mcp \
     && mkdir -p /data \
-    && chown -R yodmcp:yodmcp /app /data
+    && chown -R mcp:mcp /app /data
 
-USER yodmcp
+USER mcp
 
 ENV YODMCP_MEMORY_BACKEND=sqlite \
     YODMCP_MEMORY_DB=/data/yodmcp_memory.db \
     YODMCP_SYSTEM_DB=/data/yodmcp_system.db \
     YODMCP_TASKS_BACKEND=sqlite \
     YODMCP_METER_BACKEND=sqlite \
-    YODMCP_PLAN=free \
-    PYTHONUNBUFFERED=1
+    YODMCP_PLAN=free
 
 VOLUME ["/data"]
 
-# Glama inspects MCP over stdio. Use `yodmcp --http` for streamable HTTP.
-CMD ["yodmcp"]
+CMD ["python", "-m", "yodmcp"]

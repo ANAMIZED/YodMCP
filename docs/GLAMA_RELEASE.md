@@ -1,12 +1,12 @@
 # Glama release — YodMCP
 
-Keep the Glama CMD on **stdio** (`yodmcp`), not `yodmcp-api`.
+CMD must be stdio: `python -m yodmcp`.
+Do not use `yodmcp-api` on the Quality image.
+
+## Admin form
 
 | Field | Value |
 | --- | --- |
-| CMD | `yodmcp` |
-| Transport | MCP stdio |
-| Data | `/data` sqlite (created in image) |
-
-HTTP (`yodmcp --http`) is a separate product surface and will not score tools
-unless Glama is configured for streamable HTTP.
+| Build steps | `["pip install --no-cache-dir ."]` |
+| CMD arguments | `["python", "-m", "yodmcp"]` |
+| Placeholders | `{}` |
