@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0-dev (TDQS + CRUD completeness)
+
+### Added
+- MCP tool annotations (`readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint`) on every core tool
+- Per-parameter `Field(description=...)` coverage (100% of input schema properties)
+- Agent-facing tool descriptions: verb + resource, when/when-not, named sibling tools, auth/quota/HITL side effects
+- CRUD completeness: `memory_delete`, `plan_cache_delete`, `tasks_list`, `tasks_update`
+- `tests/test_tdqs_tools.py` + E2E checks that descriptions stay ≥80 chars and annotated
+
+### Notes
+- Glama Tool Definition Quality is scored from a **GitHub Release** snapshot. Tag `v0.5.0` and click **Sync Server** on Glama after CI is green.
+- Existing tool **names** are unchanged (`echo`, `discover_capabilities` included) so clients do not break.
+
 ## 0.5.0-dev (production-prep / multi-tenant SaaS polish)
 
 ### Added
