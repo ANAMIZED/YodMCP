@@ -1,11 +1,50 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.ANAMIZED/yodmcp",
-  "description": "Autonomous MCP Agent OS: multi-graph memory, Tasks, Skills, A2A, attestation, OpenTelemetry.",
+  "title": "YodMCP",
+  "description": "Autonomous MCP Agent OS: memory, Tasks, Skills, A2A, attestation.",
   "repository": {
     "url": "https://github.com/ANAMIZED/YodMCP",
     "source": "github"
   },
   "version": "0.5.0",
-  "websiteUrl": "https://github.com/ANAMIZED/YodMCP"
+  "websiteUrl": "https://github.com/ANAMIZED/YodMCP",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "yodmcp",
+      "version": "0.5.0",
+      "runtimeHint": "uvx",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "YODMCP_PLAN",
+          "description": "Plan tier: free, pro, or enterprise. Default free.",
+          "isRequired": false,
+          "default": "free",
+          "choices": ["free", "pro", "enterprise"]
+        },
+        {
+          "name": "YODMCP_MEMORY_BACKEND",
+          "description": "Memory backend. Use sqlite in containers.",
+          "isRequired": false,
+          "default": "sqlite",
+          "choices": ["memory", "sqlite", "durable"]
+        },
+        {
+          "name": "YODMCP_MEMORY_DB",
+          "description": "SQLite path when backend is sqlite.",
+          "isRequired": false,
+          "default": "./data/yodmcp_memory.db"
+        },
+        {
+          "name": "STRIPE_SECRET_KEY",
+          "description": "Optional Stripe key for live Checkout. Leave unset.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
 }

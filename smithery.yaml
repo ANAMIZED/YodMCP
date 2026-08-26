@@ -1,0 +1,22 @@
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required: []
+    properties:
+      plan:
+        type: string
+        default: free
+        description: YODMCP_PLAN
+  exampleConfig:
+    plan: free
+  commandFunction: |
+    (config) => ({
+      command: 'python',
+      args: ['-m', 'yodmcp'],
+      env: {
+        YODMCP_PLAN: config.plan || 'free',
+        YODMCP_MEMORY_BACKEND: 'sqlite',
+        YODMCP_PLAN_CACHE_BACKEND: 'memory'
+      }
+    })
