@@ -214,6 +214,18 @@ class DurableMultiGraphMemory:
             "by_level": by_level, "edges": edge_counts, "entities_indexed": ents,
         }
 
+    async def delete(self, item_id: str) -> bool:
+        db = await self._conn()
+        cur = await db.execute("SELECT id FROM nodes WHERE id=?", (item_id,))
+        row = await cur.fetchone()
+        if not row:
+            return False
+        await db.execute("DELETE FROM edges WHERE src=? OR dst=?", (item_id, item_id))
+        await db.execute("DELETE FROM entities WHERE node_id=?", (item_id,))
+        await db.execute("DELETE FROM nodes WHERE id=?", (item_id,))
+        await db.commit()
+        return True
+
     async def close(self) -> None:
         await self._sqlite.close()
 
