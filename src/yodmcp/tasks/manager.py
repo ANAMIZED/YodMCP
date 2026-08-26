@@ -18,6 +18,8 @@ from typing import Any, Awaitable, Callable
 
 import aiosqlite
 
+from yodmcp.storage.aiosqlite_conn import LoopSafeSqlite
+
 
 class TaskStatus(str, Enum):
     PENDING = "pending"
@@ -73,17 +75,19 @@ class TaskManager:
             or os.environ.get("YODMCP_MEMORY_DB", "./data/yodmcp_system.db")
         )
         self._tasks: dict[str, TaskRecord] = {}
-        self._lock = asyncio.Lock()
-        self._db: aiosqlite.Connection | None = None
+        self._lock: asyncio.Lock | None = None
+        self._lock_loop: asyncio.AbstractEventLoop | None = None
+        self._sqlite = LoopSafeSqlite(self._db_path)
+
+    def _mem_lock(self) -> asyncio.Lock:
+        loop = asyncio.get_running_loop()
+        if self._lock is None or self._lock_loop is not loop:
+            self._lock = asyncio.Lock()
+            self._lock_loop = loop
+        return self._lock
 
     async def _conn(self) -> aiosqlite.Connection:
-        if self._db is None:
-            Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-            self._db = await aiosqlite.connect(self._db_path)
-            self._db.row_factory = aiosqlite.Row
-            await self._db.executescript(TASK_SCHEMA)
-            await self._db.commit()
-        return self._db
+        return await self._sqlite.conn(TASK_SCHEMA)
 
     def _row_to_rec(self, row: aiosqlite.Row) -> TaskRecord:
         return TaskRecord(
@@ -142,7 +146,7 @@ class TaskManager:
             )
             await db.commit()
         else:
-            async with self._lock:
+            async with self._mem_lock():
                 self._tasks[tid] = rec
         return rec
 
@@ -188,7 +192,7 @@ class TaskManager:
             await db.commit()
             return rec
 
-        async with self._lock:
+        async with self._mem_lock():
             rec = self._tasks.get(task_id)
             if not rec:
                 return None
@@ -211,7 +215,7 @@ class TaskManager:
             cur = await db.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,))
             row = await cur.fetchone()
             return self._row_to_rec(row) if row else None
-        async with self._lock:
+        async with self._mem_lock():
             return self._tasks.get(task_id)
 
     async def cancel(self, task_id: str) -> bool:
@@ -272,7 +276,7 @@ class TaskManager:
             by_status = {r["status"]: r["c"] for r in rows}
             total = sum(by_status.values())
             return {"total": total, "by_status": by_status, "backend": "sqlite"}
-        async with self._lock:
+        async with self._mem_lock():
             by_status: dict[str, int] = {}
             for t in self._tasks.values():
                 by_status[t.status.value] = by_status.get(t.status.value, 0) + 1
