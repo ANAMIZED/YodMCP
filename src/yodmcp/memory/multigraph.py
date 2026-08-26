@@ -201,5 +201,20 @@ class MultiGraphMemory:
                 "entities_indexed": len(self._entity_index),
             }
 
+    async def delete(self, item_id: str) -> bool:
+        async with self._lock:
+            if item_id not in self._nodes:
+                return False
+            self._nodes.pop(item_id, None)
+            for graph in self._edges.values():
+                graph.pop(item_id, None)
+                for peers in graph.values():
+                    peers.discard(item_id)
+            for key, ids in list(self._entity_index.items()):
+                ids.discard(item_id)
+                if not ids:
+                    self._entity_index.pop(key, None)
+            return True
+
     async def close(self) -> None:
         pass
