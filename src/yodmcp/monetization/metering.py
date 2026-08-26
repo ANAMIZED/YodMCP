@@ -5,6 +5,7 @@ Supports in-memory and SQLite durable counters so daily quotas survive restarts.
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from collections import defaultdict
@@ -13,6 +14,8 @@ from pathlib import Path
 from typing import Any
 
 import aiosqlite
+
+from yodmcp.storage.aiosqlite_conn import LoopSafeSqlite
 
 
 @dataclass
@@ -56,15 +59,10 @@ class UsageMeter:
             lambda: defaultdict(lambda: defaultdict(int))
         )
         self._events: list[MeterEvent] = []
-        self._db: aiosqlite.Connection | None = None
+        self._sqlite = LoopSafeSqlite(self._db_path)
 
     async def _conn(self) -> aiosqlite.Connection:
-        if self._db is None:
-            Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-            self._db = await aiosqlite.connect(self._db_path)
-            await self._db.executescript(METER_SCHEMA)
-            await self._db.commit()
-        return self._db
+        return await self._sqlite.conn(METER_SCHEMA)
 
     @staticmethod
     def _day_key(ts: float | None = None) -> str:
@@ -84,12 +82,16 @@ class UsageMeter:
         self._counts[tenant_id][metric][self._day_key(ev.timestamp)] += quantity
         if self._backend == "sqlite":
             try:
-                asyncio_get = __import__("asyncio").get_event_loop
-                loop = asyncio_get()
-                if loop.is_running():
+                import asyncio
+
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+                if loop is not None and loop.is_running():
                     loop.create_task(self._record_async(ev))
                 else:
-                    loop.run_until_complete(self._record_async(ev))
+                    asyncio.run(self._record_async(ev))
             except Exception:
                 pass  # never break request path on meter write
         return ev
@@ -104,7 +106,7 @@ class UsageMeter:
         )
         await db.execute(
             "INSERT INTO usage_events (tenant_id, metric, quantity, ts, metadata) VALUES (?,?,?,?,?)",
-            (ev.tenant_id, ev.metric, ev.quantity, ev.timestamp, __import__("json").dumps(ev.metadata)),
+            (ev.tenant_id, ev.metric, ev.quantity, ev.timestamp, json.dumps(ev.metadata)),
         )
         await db.commit()
 

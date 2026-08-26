@@ -10,6 +10,7 @@ from typing import Any
 import aiosqlite
 
 from yodmcp.memory.multigraph_core import GraphKind, MemoryLevel, _cosine, _simple_embed
+from yodmcp.storage.aiosqlite_conn import LoopSafeSqlite
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS nodes (
@@ -36,15 +37,10 @@ class DurableMultiGraphMemory:
     def __init__(self, db_path: str | Path = "yodmcp_memory.db", embed_dim: int = 64) -> None:
         self.db_path = str(db_path)
         self.embed_dim = embed_dim
-        self._db: aiosqlite.Connection | None = None
+        self._sqlite = LoopSafeSqlite(self.db_path)
 
     async def _conn(self) -> aiosqlite.Connection:
-        if self._db is None:
-            self._db = await aiosqlite.connect(self.db_path)
-            self._db.row_factory = aiosqlite.Row
-            await self._db.executescript(SCHEMA)
-            await self._db.commit()
-        return self._db
+        return await self._sqlite.conn(SCHEMA)
 
     async def write(
         self, content: str, level: MemoryLevel | str = MemoryLevel.EPISODIC,
@@ -219,9 +215,7 @@ class DurableMultiGraphMemory:
         }
 
     async def close(self) -> None:
-        if self._db is not None:
-            await self._db.close()
-            self._db = None
+        await self._sqlite.close()
 
 
 def create_memory(backend: str = "memory", db_path: str | Path = "yodmcp_memory.db", embed_dim: int = 64) -> Any:

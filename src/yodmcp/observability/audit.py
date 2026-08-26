@@ -16,6 +16,8 @@ from typing import Any
 
 import aiosqlite
 
+from yodmcp.storage.aiosqlite_conn import LoopSafeSqlite
+
 
 @dataclass
 class AuditEvent:
@@ -64,15 +66,10 @@ class AuditLogger:
             or os.environ.get("YODMCP_SYSTEM_DB")
             or os.environ.get("YODMCP_MEMORY_DB", "./data/yodmcp_system.db")
         )
-        self._db: aiosqlite.Connection | None = None
+        self._sqlite = LoopSafeSqlite(self._db_path)
 
     async def _conn(self) -> aiosqlite.Connection:
-        if self._db is None:
-            Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-            self._db = await aiosqlite.connect(self._db_path)
-            await self._db.executescript(AUDIT_SCHEMA)
-            await self._db.commit()
-        return self._db
+        return await self._sqlite.conn(AUDIT_SCHEMA)
 
     def record(
         self,
@@ -118,11 +115,14 @@ class AuditLogger:
             try:
                 import asyncio
 
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+                if loop is not None and loop.is_running():
                     loop.create_task(self._persist(event))
                 else:
-                    loop.run_until_complete(self._persist(event))
+                    asyncio.run(self._persist(event))
             except Exception:
                 pass
         return event_id

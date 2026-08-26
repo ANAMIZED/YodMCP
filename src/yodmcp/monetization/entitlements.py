@@ -5,12 +5,15 @@ Activated by Stripe webhooks or manual admin. Overrides env YODMCP_PLAN.
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from pathlib import Path
 from typing import Any
 
 import aiosqlite
+
+from yodmcp.storage.aiosqlite_conn import LoopSafeSqlite
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS entitlements (
@@ -33,15 +36,10 @@ class EntitlementStore:
             or os.environ.get("YODMCP_SYSTEM_DB")
             or os.environ.get("YODMCP_MEMORY_DB", "./data/yodmcp_system.db")
         )
-        self._db: aiosqlite.Connection | None = None
+        self._sqlite = LoopSafeSqlite(self.db_path)
 
     async def _conn(self) -> aiosqlite.Connection:
-        if self._db is None:
-            Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-            self._db = await aiosqlite.connect(self.db_path)
-            await self._db.executescript(SCHEMA)
-            await self._db.commit()
-        return self._db
+        return await self._sqlite.conn(SCHEMA)
 
     async def get_plan(self, tenant_id: str) -> str | None:
         db = await self._conn()
@@ -67,8 +65,6 @@ class EntitlementStore:
         expires_at: float | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        import json
-
         db = await self._conn()
         await db.execute(
             "INSERT INTO entitlements (tenant_id, plan_id, source, stripe_customer_id, "
