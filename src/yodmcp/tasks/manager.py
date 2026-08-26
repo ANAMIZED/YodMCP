@@ -281,3 +281,6 @@ class TaskManager:
             for t in self._tasks.values():
                 by_status[t.status.value] = by_status.get(t.status.value, 0) + 1
             return {"total": len(self._tasks), "by_status": by_status, "backend": "memory"}
+
+    async def close(self) -> None:
+        await self._sqlite.close()
