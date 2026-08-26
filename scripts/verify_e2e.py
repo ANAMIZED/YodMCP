@@ -15,6 +15,22 @@ from yodmcp.core.server import create_server
 from yodmcp.a2a.surface import build_agent_card
 
 
+async def _close_sqlite(obj) -> None:
+    if obj is None:
+        return
+    closer = getattr(obj, "close", None)
+    if closer is not None:
+        try:
+            result = closer()
+            if hasattr(result, "__await__"):
+                await result
+        except Exception:
+            pass
+    sqlite = getattr(obj, "_sqlite", None)
+    if sqlite is not None and sqlite is not obj:
+        await _close_sqlite(sqlite)
+
+
 async def main() -> None:
     print(f"=== YodMCP v{__version__} Exhaustive E2E Verification ===\n")
     init_substrate(console_tracing=False)
@@ -78,6 +94,14 @@ async def main() -> None:
 
     ctx.audit.record("e2e", tool_name="verify", decision="pass", outcome="success")
     print(f"9. Audit → events={ctx.audit.stats()['total_events']}")
+
+    await _close_sqlite(getattr(ctx, "memory", None))
+    await _close_sqlite(getattr(ctx, "tasks", None))
+    await _close_sqlite(getattr(ctx, "audit", None))
+    billing = getattr(ctx, "billing", None)
+    if billing is not None:
+        await _close_sqlite(getattr(billing, "meter", None))
+        await _close_sqlite(getattr(billing, "entitlements", None))
 
     print(f"\n✅ ALL E2E CHECKS PASSED — YodMCP v{__version__} substrate is operational.")
 

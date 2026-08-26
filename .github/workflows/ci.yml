@@ -47,14 +47,25 @@ jobs:
           YODMCP_ATTEST_MODE: simulated_tee
         run: |
           PYTHONPATH=src pytest tests/ -v --tb=short --timeout=30
-          PYTHONPATH=src python scripts/verify_e2e.py
+
+      - name: E2E verification (durable backends)
+        env:
+          YODMCP_MEMORY_BACKEND: sqlite
+          YODMCP_MEMORY_DB: ${{ runner.temp }}/yodmcp_ci_e2e_memory.db
+          YODMCP_SYSTEM_DB: ${{ runner.temp }}/yodmcp_ci_e2e_system.db
+          YODMCP_TASKS_BACKEND: sqlite
+          YODMCP_METER_BACKEND: sqlite
+          YODMCP_AUDIT_BACKEND: sqlite
+          YODMCP_ATTEST_MODE: simulated_tee
+        run: |
+          PYTHONPATH=src timeout 60 python scripts/verify_e2e.py
 
       - name: E2E verification (in-memory)
         env:
           YODMCP_MEMORY_BACKEND: memory
           YODMCP_ATTEST_MODE: software
         run: |
-          PYTHONPATH=src python scripts/verify_e2e.py
+          PYTHONPATH=src timeout 60 python scripts/verify_e2e.py
 
       - name: Dependency audit (best-effort SBOM hygiene)
         continue-on-error: true
