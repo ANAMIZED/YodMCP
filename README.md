@@ -10,6 +10,25 @@
 
 This README is written so a senior engineer with **only this file + the source tree** can install, deploy every surface, exercise features, and verify end-to-end.
 
+## FOUNDRY mapping
+
+FOUNDRY (host-owned trust and memory for long-horizon agent swarms) separates untrusted proposal generation from host-owned verification + established-facts registry.
+
+YodMCP is that registry in production: agents call `memory_write`; promotion to semantic memory is gated; the host owns the evaluator. Full note: [`docs/FOUNDRY.md`](docs/FOUNDRY.md).
+
+### First dollar
+
+Meters first. Seat if the loop holds.
+
+| Unit | Stripe | x402 |
+|------|--------|------|
+| OpenGOS Search $0.40 | [Buy](https://buy.stripe.com/7sY8wQ5EW3iZ5xb5Re43S06) | `GET /v1/search` |
+| OpenGOS Draft $2.50 | [Buy](https://buy.stripe.com/9B69AUd7o7zf2kZ2F243S03) | `GET /v1/draft` |
+| Agentic OS Cycle $0.75 | [Buy](https://buy.stripe.com/3cI14o8R8dXD3p3frO43S04) | `GET /v1/cycle` |
+| **YodMCP Pro $49/mo** | [Subscribe](https://buy.stripe.com/bJe3cw0kCaLrbVz1AY43S09) | USDC |
+
+x402 rail: [x402-cloudflare-starter](https://github.com/ANAMIZED/x402-cloudflare-starter). Desk sync: https://anamized.grok.me
+
 ## Package surfaces
 
 | Surface | Command | Default | Purpose |
@@ -235,6 +254,7 @@ skills/*/SKILL.md    # portable Agent Skills (loaded at runtime)
 scripts/verify_e2e.py
 tests/
 docs/ARCHITECTURE.md
+docs/FOUNDRY.md
 ```
 
 ## Known limitations (read before claiming production)
@@ -247,4 +267,4 @@ docs/ARCHITECTURE.md
 
 ## License
 
-Apache-2.0 · [CONTRIBUTING](CONTRIBUTING.md) · [CHANGELOG](CHANGELOG.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [AGENTS.md](AGENTS.md)
+Apache-2.0 · [CONTRIBUTING](CONTRIBUTING.md) · [CHANGELOG](CHANGELOG.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [FOUNDRY](docs/FOUNDRY.md) · [AGENTS.md](AGENTS.md)
