@@ -5,13 +5,13 @@ aiosqlite connection across loops deadlocks on Python 3.12 (worker thread
 posts back to a closed loop). Reconnect when the running loop changes.
 
 Never await Connection.close() on a *different* loop — that is itself a hang.
+Call Connection.stop() so the non-daemon worker thread can exit.
 """
 
 from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
 
 import aiosqlite
 
@@ -29,9 +29,13 @@ class LoopSafeSqlite:
         if old is None:
             return
         try:
-            stopper = getattr(old, "_stop_running", None)
-            if callable(stopper):
-                stopper()
+            old.stop()
+        except Exception:
+            pass
+        try:
+            thread = getattr(old, "_thread", None)
+            if thread is not None:
+                thread.daemon = True
         except Exception:
             pass
 
@@ -52,20 +56,20 @@ class LoopSafeSqlite:
         return self._db
 
     async def close(self) -> None:
-        db, loop = self._db, self._loop
-        self._db = None
-        self._loop = None
+        db, bound = self._db, self._loop
         if db is None:
             return
         try:
             running = asyncio.get_running_loop()
         except RuntimeError:
             running = None
-        if running is not None and running is loop:
+        if running is not None and running is bound:
+            self._db = None
+            self._loop = None
             try:
                 await db.close()
                 return
             except Exception:
-                pass
-        self._db = db
+                self._db = db
+                self._loop = bound
         self._abandon()
