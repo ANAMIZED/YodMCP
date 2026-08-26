@@ -218,6 +218,29 @@ class TaskManager:
         async with self._mem_lock():
             return self._tasks.get(task_id)
 
+    async def list(self, limit: int = 20, status: str | TaskStatus | None = None) -> list[TaskRecord]:
+        wanted = None
+        if status is not None:
+            wanted = status.value if isinstance(status, TaskStatus) else str(status)
+        if self._backend == "sqlite":
+            db = await self._conn()
+            if wanted:
+                cur = await db.execute(
+                    "SELECT * FROM tasks WHERE status=? ORDER BY updated_at DESC LIMIT ?",
+                    (wanted, limit),
+                )
+            else:
+                cur = await db.execute(
+                    "SELECT * FROM tasks ORDER BY updated_at DESC LIMIT ?", (limit,)
+                )
+            return [self._row_to_rec(row) for row in await cur.fetchall()]
+        async with self._mem_lock():
+            recs = list(self._tasks.values())
+            if wanted:
+                recs = [r for r in recs if r.status.value == wanted]
+            recs.sort(key=lambda r: r.updated_at, reverse=True)
+            return recs[:limit]
+
     async def cancel(self, task_id: str) -> bool:
         rec = await self.update(task_id, status=TaskStatus.CANCELLED)
         return rec is not None
