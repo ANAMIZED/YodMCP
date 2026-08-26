@@ -92,6 +92,13 @@ class CacheLayer:
         val, score = self.get_semantic("plan", task_desc)
         return (val if isinstance(val, dict) else None), score
 
+    def delete_plan(self, task_desc: str) -> bool:
+        k = self._key("plan", task_desc)
+        existed = k in self._exact
+        self._exact.pop(k, None)
+        self._entries = [e for e in self._entries if e.key != k]
+        return existed
+
     def stats(self) -> dict[str, Any]:
         hits = sum(e.hits for e in self._entries)
         return {
