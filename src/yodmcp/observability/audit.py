@@ -6,6 +6,7 @@ with provenance. Supports process-local + JSONL and optional SQLite durable inde
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -67,6 +68,7 @@ class AuditLogger:
             or os.environ.get("YODMCP_MEMORY_DB", "./data/yodmcp_system.db")
         )
         self._sqlite = LoopSafeSqlite(self._db_path)
+        self._bg: set[asyncio.Task[None]] = set()
 
     async def _conn(self) -> aiosqlite.Connection:
         return await self._sqlite.conn(AUDIT_SCHEMA)
@@ -113,14 +115,14 @@ class AuditLogger:
 
         if self._backend in ("sqlite", "db", "durable"):
             try:
-                import asyncio
-
                 try:
                     loop = asyncio.get_running_loop()
                 except RuntimeError:
                     loop = None
                 if loop is not None and loop.is_running():
-                    loop.create_task(self._persist(event))
+                    task = loop.create_task(self._persist(event))
+                    self._bg.add(task)
+                    task.add_done_callback(self._bg.discard)
                 else:
                     asyncio.run(self._persist(event))
             except Exception:
@@ -128,26 +130,29 @@ class AuditLogger:
         return event_id
 
     async def _persist(self, event: AuditEvent) -> None:
-        db = await self._conn()
-        await db.execute(
-            "INSERT OR IGNORE INTO audit_events "
-            "(id, timestamp, event_type, actor, session_id, tool_name, arguments_summary, "
-            "decision, risk_tier, outcome, metadata) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (
-                event.id,
-                event.timestamp,
-                event.event_type,
-                event.actor,
-                event.session_id,
-                event.tool_name,
-                event.arguments_summary,
-                event.decision,
-                event.risk_tier,
-                event.outcome,
-                json.dumps(event.metadata),
-            ),
-        )
-        await db.commit()
+        try:
+            db = await self._conn()
+            await db.execute(
+                "INSERT OR IGNORE INTO audit_events "
+                "(id, timestamp, event_type, actor, session_id, tool_name, arguments_summary, "
+                "decision, risk_tier, outcome, metadata) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    event.id,
+                    event.timestamp,
+                    event.event_type,
+                    event.actor,
+                    event.session_id,
+                    event.tool_name,
+                    event.arguments_summary,
+                    event.decision,
+                    event.risk_tier,
+                    event.outcome,
+                    json.dumps(event.metadata),
+                ),
+            )
+            await db.commit()
+        except Exception:
+            return
 
     def recent(self, limit: int = 50) -> list[AuditEvent]:
         return self._events[-limit:]
@@ -164,3 +169,10 @@ class AuditLogger:
             "backend": self._backend,
             "log_path": str(self._path),
         }
+
+    async def close(self) -> None:
+        pending = [t for t in self._bg if not t.done()]
+        self._bg.clear()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        await self._sqlite.close()

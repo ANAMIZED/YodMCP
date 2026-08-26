@@ -89,3 +89,6 @@ class EntitlementStore:
         db = await self._conn()
         await db.execute("DELETE FROM entitlements WHERE tenant_id = ?", (tenant_id,))
         await db.commit()
+
+    async def close(self) -> None:
+        await self._sqlite.close()

@@ -5,6 +5,7 @@ Supports in-memory and SQLite durable counters so daily quotas survive restarts.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -60,6 +61,7 @@ class UsageMeter:
         )
         self._events: list[MeterEvent] = []
         self._sqlite = LoopSafeSqlite(self._db_path)
+        self._bg: set[asyncio.Task[None]] = set()
 
     async def _conn(self) -> aiosqlite.Connection:
         return await self._sqlite.conn(METER_SCHEMA)
@@ -82,14 +84,14 @@ class UsageMeter:
         self._counts[tenant_id][metric][self._day_key(ev.timestamp)] += quantity
         if self._backend == "sqlite":
             try:
-                import asyncio
-
                 try:
                     loop = asyncio.get_running_loop()
                 except RuntimeError:
                     loop = None
                 if loop is not None and loop.is_running():
-                    loop.create_task(self._record_async(ev))
+                    task = loop.create_task(self._record_async(ev))
+                    self._bg.add(task)
+                    task.add_done_callback(self._bg.discard)
                 else:
                     asyncio.run(self._record_async(ev))
             except Exception:
@@ -97,18 +99,21 @@ class UsageMeter:
         return ev
 
     async def _record_async(self, ev: MeterEvent) -> None:
-        db = await self._conn()
-        day = self._day_key(ev.timestamp)
-        await db.execute(
-            "INSERT INTO usage_daily (tenant_id, metric, day, quantity) VALUES (?,?,?,?) "
-            "ON CONFLICT(tenant_id, metric, day) DO UPDATE SET quantity = quantity + excluded.quantity",
-            (ev.tenant_id, ev.metric, day, ev.quantity),
-        )
-        await db.execute(
-            "INSERT INTO usage_events (tenant_id, metric, quantity, ts, metadata) VALUES (?,?,?,?,?)",
-            (ev.tenant_id, ev.metric, ev.quantity, ev.timestamp, json.dumps(ev.metadata)),
-        )
-        await db.commit()
+        try:
+            db = await self._conn()
+            day = self._day_key(ev.timestamp)
+            await db.execute(
+                "INSERT INTO usage_daily (tenant_id, metric, day, quantity) VALUES (?,?,?,?) "
+                "ON CONFLICT(tenant_id, metric, day) DO UPDATE SET quantity = quantity + excluded.quantity",
+                (ev.tenant_id, ev.metric, day, ev.quantity),
+            )
+            await db.execute(
+                "INSERT INTO usage_events (tenant_id, metric, quantity, ts, metadata) VALUES (?,?,?,?,?)",
+                (ev.tenant_id, ev.metric, ev.quantity, ev.timestamp, json.dumps(ev.metadata)),
+            )
+            await db.commit()
+        except Exception:
+            return
 
     def usage_today(self, tenant_id: str, metric: str) -> int:
         # Prefer in-memory for speed; durable is eventual consistency for cross-process
@@ -148,3 +153,10 @@ class UsageMeter:
             }
             for e in self._events[-limit:]
         ]
+
+    async def close(self) -> None:
+        pending = [t for t in self._bg if not t.done()]
+        self._bg.clear()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        await self._sqlite.close()
