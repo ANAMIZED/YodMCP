@@ -78,7 +78,6 @@ class LoopSafeSqlite:
         try:
             running = asyncio.get_running_loop()
         except RuntimeError:
-            running = None
             self._abandon()
             return
         async with self._get_lock():
@@ -90,8 +89,6 @@ class LoopSafeSqlite:
             if running is bound:
                 try:
                     await db.close()
-                    return
                 except Exception:
-                    _stop_worker(db)
-                    return
+                    pass
             _stop_worker(db)
