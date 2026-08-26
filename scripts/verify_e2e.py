@@ -44,15 +44,19 @@ async def main() -> None:
     required = {
         "memory_write",
         "memory_read",
+        "memory_delete",
         "memory_consolidate",
         "memory_stats",
         "tasks_create",
         "tasks_get",
+        "tasks_list",
+        "tasks_update",
         "tasks_cancel",
         "skills_list",
         "a2a_card",
         "plan_cache_get",
         "plan_cache_put",
+        "plan_cache_delete",
         "attestation_recent",
         "audit_recent",
         "cache_stats",
@@ -61,6 +65,8 @@ async def main() -> None:
     }
     missing = required - set(names)
     assert not missing, f"Missing tools: {missing}"
+    short = [t.name for t in tools if not (getattr(t, "description", None) or "") or len(t.description) < 80]
+    assert not short, f"Short tool descriptions: {short}"
 
     id1 = await ctx.memory.write("YodMCP multi-graph online", importance=0.95, entities=["YodMCP"])
     id2 = await ctx.memory.write("Causal follow-up", importance=0.8, causal_parent=id1)
@@ -69,17 +75,22 @@ async def main() -> None:
     assert len(items) >= 1
     promoted = await ctx.memory.consolidate()
     print(f"3. Consolidate → promoted {promoted}")
+    scratch = await ctx.memory.write("ephemeral e2e node", importance=0.2)
+    assert await ctx.memory.delete(scratch) is True
 
     ctx.cache.put_plan("deploy yodmcp", {"steps": ["build", "test", "ship"]})
     plan, score = ctx.cache.get_plan("deploy the yodmcp service")
     print(f"4. Plan cache → found={plan is not None}, score={score:.3f}")
     assert plan is not None, f"plan cache miss score={score}"
+    assert ctx.cache.delete_plan("deploy yodmcp") is True
 
     handle = ctx.tasks.to_handle(await ctx.tasks.create(tool_name="e2e"))
     assert handle["resultType"] == "task"
     await ctx.tasks.update(handle["taskId"], status="completed", progress=1.0, result={"ok": True})
     got = await ctx.tasks.get(handle["taskId"])
-    print(f"5. Tasks → status={got.status.value}")
+    listed = await ctx.tasks.list(limit=5)
+    print(f"5. Tasks → status={got.status.value}, listed={len(listed)}")
+    assert any(r.task_id == handle["taskId"] for r in listed)
 
     skills = ctx.skills.list_skills()
     print(f"6. Skills → {len(skills)} registered, sample={skills[0].name}")
