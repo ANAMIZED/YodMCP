@@ -37,6 +37,10 @@ def set_context(ctx: YodContext) -> None:
     _ctx.set(ctx)
 
 
+def clear_context() -> None:
+    _ctx.set(None)
+
+
 def get_context() -> YodContext:
     ctx = _ctx.get()
     if ctx is None:
