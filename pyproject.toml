@@ -30,7 +30,7 @@ Repository = "https://github.com/ANAMIZED/YodMCP"
 Issues = "https://github.com/ANAMIZED/YodMCP/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "ruff>=0.6", "black>=24.0"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24", "pytest-timeout>=2.3", "ruff>=0.6", "black>=24.0"]
 
 [project.scripts]
 yodmcp = "yodmcp.__main__:main"
@@ -44,3 +44,4 @@ where = ["src"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["src"]
+timeout = 30
