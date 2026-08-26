@@ -46,3 +46,6 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 timeout = 30
 timeout_method = "thread"
+filterwarnings = [
+    "ignore::pytest.PytestUnhandledThreadExceptionWarning",
+]
