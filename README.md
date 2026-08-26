@@ -1,7 +1,8 @@
 # YodMCP — Agent Operating System
 
 [![CI](https://github.com/ANAMIZED/YodMCP/actions/workflows/ci.yml/badge.svg)](https://github.com/ANAMIZED/YodMCP/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](https://github.com/ANAMIZED/YodMCP)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](https://github.com/ANAMIZED/YodMCP)
+[![YodMCP MCP server](https://glama.ai/mcp/servers/ANAMIZED/YodMCP/badges/score.svg)](https://glama.ai/mcp/servers/ANAMIZED/YodMCP/score)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-2026--07--28-purple.svg)](https://modelcontextprotocol.io/)
@@ -32,7 +33,7 @@ x402 rail: [x402-cloudflare-starter](https://github.com/ANAMIZED/x402-cloudflare
 ## Package surfaces
 
 | Surface | Command | Default | Purpose |
-|---------|---------|---------|---------|
+|---------|---------|---------|
 | **MCP** | `yodmcp` | stdio | Local MCP clients (Cursor, Claude Desktop, etc.) |
 | **MCP HTTP** | `yodmcp --http --port 8000` | `:8000/mcp` | Remote / Streamable HTTP MCP |
 | **API** | `yodmcp-api --port 8080` | `:8080` | REST health, memory, audit, skills, billing |
@@ -51,7 +52,7 @@ x402 rail: [x402-cloudflare-starter](https://github.com/ANAMIZED/x402-cloudflare
 ```bash
 git clone https://github.com/ANAMIZED/YodMCP.git
 cd YodMCP
-python -m venv .venv && source .venv/bin/activate   # recommended
+python -m venv .venv && source .venv.bin/activate   # recommended
 pip install -e ".[dev]"
 ```
 
@@ -186,19 +187,25 @@ python examples/sdk_quickstart.py   # requires API on :8080
 
 | Tool | Description |
 |------|-------------|
-| `memory_write` | Persist into multi-graph hierarchical memory |
-| `memory_read` | Retrieve with embedding similarity |
-| `memory_consolidate` | Promote high-importance episodic to semantic |
-| `memory_stats` | Node/edge counts |
-| `tasks_create` / `tasks_get` / `tasks_cancel` / `tasks_stats` | Durable async task handles |
-| `skills_list` | List Agent Skills (+ resource URIs) |
-| `a2a_card` | A2A Agent Card JSON |
-| `plan_cache_get` / `plan_cache_put` | Semantic plan cache |
-| `cache_stats` | Cache statistics |
-| `attestation_recent` | Recent TRACE-style claims |
-| `audit_recent` | Recent policy/audit events |
-| `discover_capabilities` | Progressive discovery of tools + skills |
-| `echo` | Connectivity probe |
+| `memory_write` | Insert one memory node (facts/decisions). Not for plans (`plan_cache_put`). |
+| `memory_read` | Retrieve nodes by similarity or `item_id`. Not for plans (`plan_cache_get`). |
+| `memory_delete` | Hard-delete one node + incident edges. Idempotent if missing. |
+| `memory_consolidate` | Promote importance ≥ 0.8 into semantic summaries. Does not delete sources. |
+| `memory_stats` | Node/edge/entity counts. Not content (`memory_read`). |
+| `tasks_create` | Create a durable pending task handle. |
+| `tasks_get` | Fetch one handle by id. |
+| `tasks_list` | List recent handles, optional status filter. |
+| `tasks_update` | Patch status/progress/result. Not cancel (`tasks_cancel`). |
+| `tasks_cancel` | Mark a handle cancelled (kernel state only). |
+| `tasks_stats` | Counts by status. Not a listing (`tasks_list`). |
+| `skills_list` | List Agent Skills + `skills://` URIs (bodies are resources). |
+| `a2a_card` | A2A Agent Card JSON. Not the MCP catalog (`discover_capabilities`). |
+| `plan_cache_get` / `plan_cache_put` / `plan_cache_delete` | Semantic plan templates. Not memory facts. |
+| `cache_stats` | In-process cache entry/hit totals. |
+| `attestation_recent` | TRACE-style provenance claims. Not the audit trail (`audit_recent`). |
+| `audit_recent` | Policy/tool Decision-System-of-Record events. |
+| `discover_capabilities` | List MCP tools + loaded skills. |
+| `echo` | Liveness probe (`message` echoed + version). |
 
 Resources:
 
@@ -255,6 +262,7 @@ scripts/verify_e2e.py
 tests/
 docs/ARCHITECTURE.md
 docs/FOUNDRY.md
+docs/TDQS.md
 ```
 
 ## Known limitations (read before claiming production)
@@ -267,4 +275,4 @@ docs/FOUNDRY.md
 
 ## License
 
-Apache-2.0 · [CONTRIBUTING](CONTRIBUTING.md) · [CHANGELOG](CHANGELOG.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [FOUNDRY](docs/FOUNDRY.md) · [AGENTS.md](AGENTS.md)
+Apache-2.0 · [CONTRIBUTING](CONTRIBUTING.md) · [CHANGELOG](CHANGELOG.md) · [ARCHITECTURE](docs/ARCHITECTURE.md) · [FOUNDRY](docs/FOUNDRY.md) · [TDQS](docs/TDQS.md) · [AGENTS.md](AGENTS.md)
