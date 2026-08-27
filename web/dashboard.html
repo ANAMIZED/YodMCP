@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YodMCP — WebMCP dashboard</title>
+  <style>
+    body { margin:0; font:15px/1.5 system-ui,sans-serif; background:#0f172a; color:#e2e8f0; }
+    main { max-width:720px; margin:0 auto; padding:32px 20px; }
+    a, code { color:#38bdf8; }
+    .panel { background:#1e293b; border-radius:10px; padding:14px 16px; margin:14px 0; }
+    input { width:100%; background:#0f172a; color:#e2e8f0; border:1px solid #334155; border-radius:8px; padding:8px; }
+    #webmcp-log { white-space:pre-wrap; color:#94a3b8; font:12px/1.4 ui-monospace,monospace; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>YodMCP</h1>
+  <p>Operator front door for visiting browser agents. Kernel tools stay on MCP + authenticated API.</p>
+  <div class="panel" id="webmcp-status">Detecting WebMCP…</div>
+  <div class="panel">
+    <label for="api-key">Optional API key for /api/* reads</label>
+    <input id="api-key" type="password" autocomplete="off" placeholder="X-API-Key">
+  </div>
+  <div class="panel">Tools: <code>health</code> · <code>ready</code> · <code>discovery</code> · <code>list_skills</code> · <code>audit_recent</code></div>
+  <div class="panel"><div id="webmcp-log"></div></div>
+</main>
+<script src="webmcp.js"></script>
+<script src="yodmcp-webmcp.js"></script>
+</body>
+</html>
